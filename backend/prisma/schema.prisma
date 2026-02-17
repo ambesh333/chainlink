@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Network {
+  SEPOLIA
+}
+
+enum Token {
+  ETH
+}
+
+enum ResourceType {
+  IMAGE
+  VIDEO
+  LINK
+}
+
+// User: Ethereum wallet-authenticated users
+model User {
+  id            String     @id @default(uuid())
+  walletAddress String     @unique
+  displayName   String?
+  lastLogin     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  resources     Resource[]
+}
+
+// AuthChallenge: Short-lived nonces for SIWE (Sign-In With Ethereum)
+model AuthChallenge {
+  id            String   @id @default(uuid())
+  walletAddress String
+  nonce         String   @unique
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([walletAddress])
+}
+
+// Resource: Data assets owned by users
+model Resource {
+  id                  String       @id @default(uuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id])
+  title               String
+  description         String?
+  type                ResourceType
+  price               Float        @default(0)
+  url                 String?
+  imageData           String?
+  network             Network      @default(SEPOLIA)
+  token               Token        @default(ETH)
+  isActive            Boolean      @default(true)
+  autoApprovalMinutes Int          @default(60)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([userId])
+}
+
