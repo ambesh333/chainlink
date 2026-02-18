@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getApiUrl } from '@/lib/config';
 import { useAuth } from '@/components/AuthContext';
-import { ArrowLeft, Copy, Check, ExternalLink, Image, Video, Link as LinkIcon, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Image, Video, Link as LinkIcon, Shield, Zap, Lock, Eye, EyeOff, FileCheck, Clock, ExternalLink } from 'lucide-react';
 
 interface Resource {
     id: string;
@@ -93,22 +93,21 @@ export default function ResourceDetailPage() {
         );
     }
 
-    const curlExample = `curl -X GET "${gatewayUrl}"
+    const curlExample = `# Step 1: Request resource → get 402 + escrow contract address
+curl -X GET "${gatewayUrl}"
 
-# Response: 402 Payment Required
-# {
-#   "paymentRequirements": {
-#     "scheme": "exact",
-#     "network": "ethereum-sepolia",
-#     "token": "ETH",
-#     "maxAmountRequired": "${resource.price}",
-#     "payTo": "<facilitator_address>"
-#   }
-# }
+# Step 2: Deposit ETH into the escrow smart contract
+#    Call: deposit("${resource.id}", "<merchant_addr>") with ${resource.price} ETH
+#    On contract: <escrow_contract_address>
+#    Use: cast send or ethers.js
 
-# After sending ETH payment on Sepolia:
+# Step 3: Access resource with escrow proof
 curl -X GET "${gatewayUrl}" \\
-  -H 'X-Payment: {"version":1,"scheme":"exact","network":"sepolia","payload":{"txHash":"0xYOUR_TX_HASH","sender":"0xYOUR_ADDRESS","amount":"${resource.price}","timestamp":1234567890}}'`;
+  -H 'X-Payment: eyJ2ZXJzaW9uIjoxLCJzY2hlbWUiOiJjaGFpbmxpbmstZXNjcm93IiwicGF5bG9hZCI6eyJlc2Nyb3dJZCI6MCwidHhIYXNoIjoiMHgiLCJzZW5kZXIiOiIweCJ9fQ=='
+
+# Step 4: Settle on-chain → release funds to merchant
+#    Call: settle(escrowId) on the escrow contract
+#    Or do nothing — Chainlink Automation auto-settles after deadline!`;
 
     return (
         <div className="max-w-3xl mx-auto">
@@ -153,8 +152,54 @@ curl -X GET "${gatewayUrl}" \\
                         <p className="text-[#F4F4F5] font-bold mt-1">{resource.price} ETH</p>
                     </div>
                     <div className="bg-black/30 rounded-xl p-4 border border-white/5">
-                        <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Token</span>
-                        <p className="text-[#F4F4F5] font-bold mt-1">{resource.token}</p>
+                        <span className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Escrow Timeout</span>
+                        <p className="text-[#F4F4F5] font-bold mt-1">{resource.autoApprovalMinutes} min</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Chainlink Features */}
+            <div className="bg-[#0a0a0f]/60 backdrop-blur-2xl rounded-3xl border border-white/10 p-8 shadow-2xl relative overflow-hidden mb-6">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/40 to-transparent" />
+
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                        <Lock size={20} className="text-purple-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-[#F4F4F5]">Chainlink Tech Stack</h3>
+                        <p className="text-xs text-gray-500">4 Chainlink features integrated</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-3 bg-black/30 p-4 rounded-xl border border-white/5">
+                        <EyeOff size={16} className="text-purple-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#F4F4F5]">Private Token</p>
+                            <p className="text-[11px] text-gray-500">Shielded addresses + hide-sender</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-black/30 p-4 rounded-xl border border-white/5">
+                        <Shield size={16} className="text-[#4CAF50] flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#F4F4F5]">Chainlink ACE</p>
+                            <p className="text-[11px] text-gray-500">Compliance on every transfer</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-black/30 p-4 rounded-xl border border-white/5">
+                        <FileCheck size={16} className="text-blue-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#F4F4F5]">On-Chain Escrow</p>
+                            <p className="text-[11px] text-gray-500">Trustless smart contract lock</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-black/30 p-4 rounded-xl border border-white/5">
+                        <Clock size={16} className="text-amber-400 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#F4F4F5]">Chainlink Automation</p>
+                            <p className="text-[11px] text-gray-500">Auto-settle expired escrows</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -165,11 +210,11 @@ curl -X GET "${gatewayUrl}" \\
 
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-[#4CAF50]/10 rounded-lg">
-                        <Shield size={20} className="text-[#4CAF50]" />
+                        <Zap size={20} className="text-[#4CAF50]" />
                     </div>
                     <div>
                         <h3 className="text-lg font-bold text-[#F4F4F5]">x402 Payment Gateway</h3>
-                        <p className="text-xs text-gray-500">HTTP 402 — Pay-per-access with ETH on Sepolia</p>
+                        <p className="text-xs text-gray-500">On-chain escrow · Chainlink Automation · Privacy-preserving</p>
                     </div>
                 </div>
 
@@ -192,17 +237,17 @@ curl -X GET "${gatewayUrl}" \\
 
                 {/* How it works */}
                 <div className="mb-6">
-                    <label className="text-[10px] uppercase font-bold text-gray-600 block mb-3 tracking-wider">How x402 Works</label>
+                    <label className="text-[10px] uppercase font-bold text-gray-600 block mb-3 tracking-wider">How On-Chain Escrow x402 Works</label>
                     <div className="space-y-3">
                         {[
-                            { step: '1', text: 'Client sends GET request to the gateway endpoint' },
-                            { step: '2', text: 'Server responds with 402 + payment requirements (amount, payTo, network)' },
-                            { step: '3', text: `Client sends ${resource.price} ETH to the payTo address on Sepolia` },
-                            { step: '4', text: 'Client retries GET request with X-Payment header containing tx hash' },
-                            { step: '5', text: 'Server verifies the transaction on-chain and delivers the resource' },
-                        ].map(({ step, text }) => (
+                            { step: '1', text: 'Agent sends GET request → receives 402 + escrow contract address + payment details', color: 'bg-[#375BD2]' },
+                            { step: '2', text: 'Agent calls deposit(resourceId, merchant) on the PrivacyEscrow contract with ETH', color: 'bg-purple-500' },
+                            { step: '3', text: 'Agent retries GET with X-Payment header → server verifies on-chain deposit → delivers resource', color: 'bg-[#4CAF50]' },
+                            { step: '4', text: 'Agent calls settle(escrowId) on-chain → funds released to merchant. Or dispute(escrowId, reason) to freeze', color: 'bg-amber-500' },
+                            { step: '5', text: 'If agent does nothing → Chainlink Automation auto-settles after the deadline (trustless!)', color: 'bg-blue-500' },
+                        ].map(({ step, text, color }) => (
                             <div key={step} className="flex items-start gap-3 bg-black/20 p-3 rounded-lg border border-white/5">
-                                <span className="w-6 h-6 bg-[#375BD2] text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className={`w-6 h-6 ${color} text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
                                     {step}
                                 </span>
                                 <span className="text-sm text-gray-300">{text}</span>
@@ -211,10 +256,43 @@ curl -X GET "${gatewayUrl}" \\
                     </div>
                 </div>
 
+                {/* Escrow Contract Info */}
+                <div className="mb-6 bg-black/30 p-4 rounded-xl border border-white/5">
+                    <label className="text-[10px] uppercase font-bold text-gray-600 block mb-2 tracking-wider">Smart Contract</label>
+                    <div className="flex items-center gap-2">
+                        <code className="text-xs text-amber-400/80 font-mono">PrivacyEscrow.sol</code>
+                        <span className="text-gray-600">·</span>
+                        <span className="text-[11px] text-gray-500">Sepolia</span>
+                        <span className="text-gray-600">·</span>
+                        <a
+                            href="https://automation.chain.link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-[#375BD2] hover:underline"
+                        >
+                            Chainlink Automation <ExternalLink size={10} />
+                        </a>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                        <div>
+                            <span className="text-gray-600">deposit()</span>
+                            <p className="text-gray-400">Lock ETH</p>
+                        </div>
+                        <div>
+                            <span className="text-gray-600">settle()</span>
+                            <p className="text-gray-400">Release to merchant</p>
+                        </div>
+                        <div>
+                            <span className="text-gray-600">dispute()</span>
+                            <p className="text-gray-400">Freeze funds</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* cURL Example */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Example (cURL)</label>
+                        <label className="text-[10px] uppercase font-bold text-gray-600 tracking-wider">Integration Example</label>
                         <button
                             onClick={() => handleCopy(curlExample, 'curl')}
                             className={`flex items-center gap-1 text-xs px-3 py-1 rounded-lg transition-colors ${copied === 'curl' ? 'text-green-500 bg-green-500/10' : 'text-gray-500 hover:text-white hover:bg-white/10'}`}

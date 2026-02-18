@@ -20,15 +20,24 @@ enum ResourceType {
   LINK
 }
 
-// User: Ethereum wallet-authenticated users
+enum TransactionStatus {
+  PENDING
+  SETTLED
+  REFUND_REQUESTED
+  REFUNDED
+}
+
+// User: Ethereum wallet-authenticated users (merchants)
 model User {
-  id            String     @id @default(uuid())
-  walletAddress String     @unique
-  displayName   String?
-  lastLogin     DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  resources     Resource[]
+  id              String        @id @default(uuid())
+  walletAddress   String        @unique
+  displayName     String?
+  shieldedAddress String?       // Chainlink Private Token shielded address
+  lastLogin       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  resources       Resource[]
+  transactions    Transaction[]
 }
 
 // AuthChallenge: Short-lived nonces for SIWE (Sign-In With Ethereum)
@@ -45,22 +54,48 @@ model AuthChallenge {
 
 // Resource: Data assets owned by users
 model Resource {
-  id                  String       @id @default(uuid())
+  id                  String        @id @default(uuid())
   userId              String
-  user                User         @relation(fields: [userId], references: [id])
+  user                User          @relation(fields: [userId], references: [id])
   title               String
   description         String?
   type                ResourceType
-  price               Float        @default(0)
+  price               Float         @default(0)
   url                 String?
-  imageData           String?
-  network             Network      @default(SEPOLIA)
-  token               Token        @default(ETH)
-  isActive            Boolean      @default(true)
-  autoApprovalMinutes Int          @default(60)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  imageData           String?       @db.Text
+  network             Network       @default(SEPOLIA)
+  token               Token         @default(ETH)
+  isActive            Boolean       @default(true)
+  autoApprovalMinutes Int           @default(60)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  transactions        Transaction[]
 
   @@index([userId])
 }
 
+// Transaction: Escrow records for x402 payments
+model Transaction {
+  id                     String            @id @default(uuid())
+  userId                 String
+  user                   User              @relation(fields: [userId], references: [id])
+  resourceId             String?
+  resource               Resource?         @relation(fields: [resourceId], references: [id])
+  agentId                String            // Agent wallet or shielded address
+  amount                 Float
+  network                Network           @default(SEPOLIA)
+  token                  Token             @default(ETH)
+  status                 TransactionStatus @default(PENDING)
+  receiptCode            String            @unique @default(uuid())
+  autoSettleAt           DateTime?
+  expiryAt               DateTime
+  paymentTransactionId   String?           // Private Token API transaction_id
+  paymentHeader          String?           @db.Text
+  encryptedDisputeReason String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([resourceId])
+  @@index([autoSettleAt])
+}

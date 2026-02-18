@@ -1,0 +1,325 @@
+[
+    {
+        "type": "constructor",
+        "inputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "deposit",
+        "inputs": [
+            {
+                "name": "resourceId",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "payable"
+    },
+    {
+        "type": "function",
+        "name": "settle",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "dispute",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "reason",
+                "type": "string",
+                "internalType": "string"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "resolveDispute",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "refund",
+                "type": "bool",
+                "internalType": "bool"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "getEscrow",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "agent",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "resourceId",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "status",
+                "type": "uint8",
+                "internalType": "enum PrivacyEscrow.EscrowStatus"
+            },
+            {
+                "name": "createdAt",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "deadline",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "disputeReason",
+                "type": "string",
+                "internalType": "string"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "escrowCount",
+        "inputs": [],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "checkUpkeep",
+        "inputs": [
+            {
+                "name": "",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "upkeepNeeded",
+                "type": "bool",
+                "internalType": "bool"
+            },
+            {
+                "name": "performData",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "performUpkeep",
+        "inputs": [
+            {
+                "name": "performData",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "event",
+        "name": "EscrowCreated",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "agent",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false
+            },
+            {
+                "name": "resourceId",
+                "type": "string",
+                "indexed": false
+            },
+            {
+                "name": "deadline",
+                "type": "uint256",
+                "indexed": false
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "EscrowSettled",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "EscrowAutoSettled",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "EscrowDisputed",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "agent",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "reason",
+                "type": "string",
+                "indexed": false
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "EscrowRefunded",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "agent",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false
+            }
+        ]
+    },
+    {
+        "type": "event",
+        "name": "EscrowDisputeRejected",
+        "inputs": [
+            {
+                "name": "escrowId",
+                "type": "uint256",
+                "indexed": true
+            },
+            {
+                "name": "merchant",
+                "type": "address",
+                "indexed": true
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false
+            }
+        ]
+    }
+]
