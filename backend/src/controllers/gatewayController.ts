@@ -1,30 +1,34 @@
 import { Request, Response } from 'express';
 import { prisma } from '../context';
-import { privateTransfer, getTransactions } from '../clients/privateTokenClient';
-import { verifyDeposit, getEscrowDetails, getEscrowContractAddress, getStatusLabel, EscrowStatus } from '../clients/escrowClient';
+import {
+    verifyDeposit,
+    createEscrowOnChain,
+    finalizeSettlementOnChain,
+    getEscrowContractAddress,
+    generateEscrowKey,
+    getLockedAmount,
+} from '../clients/escrowClient';
 
-const FACILITATOR_SHIELDED_ADDRESS = process.env.FACILITATOR_SHIELDED_ADDRESS || '';
-const FACILITATOR_PRIVATE_KEY = process.env.FACILITATOR_PRIVATE_KEY || '';
-const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS || '';
 const ESCROW_CONTRACT_ADDRESS = process.env.ESCROW_CONTRACT_ADDRESS || '';
 
 /**
- * Payment header format for x402 with on-chain escrow
+ * Payment header sent by the agent after they have called deposit(key) on-chain.
+ *
+ * Encode as: btoa(JSON.stringify({ version: 1, scheme: "chainlink-escrow", payload: { key, txHash, sender } }))
  */
 interface EscrowPaymentHeader {
     version: number;
     scheme: 'chainlink-escrow';
     payload: {
-        escrowId: number;       // On-chain escrow ID from deposit()
-        txHash: string;         // Deposit transaction hash
-        sender: string;         // Agent address
+        key: string;       // bytes32 escrow key (0x-prefixed hex)
+        txHash: string;    // deposit() transaction hash
+        sender: string;    // agent wallet address
     };
 }
 
 const parsePaymentHeader = (raw: string): EscrowPaymentHeader | null => {
     try {
-        const decoded = Buffer.from(raw, 'base64').toString('utf-8');
-        return JSON.parse(decoded);
+        return JSON.parse(Buffer.from(raw, 'base64').toString('utf-8'));
     } catch {
         try {
             return JSON.parse(raw);
@@ -37,122 +41,197 @@ const parsePaymentHeader = (raw: string): EscrowPaymentHeader | null => {
 /**
  * GET /api/gateway/resource/:resourceId
  *
- * x402 Gateway with on-chain escrow.
+ * x402 Gateway with on-chain escrow (EscrowMarketplace.sol).
  *
- * Without X-Payment header:
- *   Returns 402 with escrow contract address + payment instructions
+ * ── Without X-Payment header ──────────────────────────────────────────────────
+ *   If X-Agent-Address header is present:
+ *     1. Backend (facilitator) calls createEscrow(key, merchant, agent, 0x0, amount, holdDuration)
+ *     2. Returns 402 with the escrow key so the agent can call deposit(key)
+ *   Otherwise:
+ *     Returns 402 with instructions only.
  *
- * With X-Payment header (contains escrowId):
- *   Verifies on-chain deposit → creates DB record → delivers resource
+ * ── With X-Payment header ────────────────────────────────────────────────────
+ *   1. Parse key from header
+ *   2. Read lockedForResource[key] on-chain to verify deposit >= price
+ *   3. Deliver resource content
  */
 export const accessResource = async (req: Request, res: Response) => {
     try {
         const resourceId = req.params.resourceId as string;
         const paymentHeaderRaw = (req.header('X-Payment') || req.header('Authorization')) as string | undefined;
+        const agentAddress = req.header('X-Agent-Address') || null;
 
-        // 1. Fetch resource details
+        // 1. Fetch resource
         const resource = await prisma.resource.findUnique({
             where: { id: resourceId },
-            include: { user: true }
+            include: { user: true },
         });
 
         if (!resource) {
             return res.status(404).json({ error: 'Resource not found' });
         }
 
-        // 2. Build payment requirements
         const priceWei = BigInt(Math.floor(resource.price * 1e18));
 
         const paymentRequirements = {
             x402Version: 1,
             scheme: 'chainlink-escrow',
             network: 'ethereum-sepolia',
+            chainId: 11155111,
             escrowContract: ESCROW_CONTRACT_ADDRESS,
-            payTo: FACILITATOR_SHIELDED_ADDRESS,     // Shielded — never exposes real wallet
-            maxAmountRequired: resource.price.toString(),
-            maxAmountRequiredWei: priceWei.toString(),
+            merchantAddress: resource.user.walletAddress,
+            amount: resource.price,
+            amountWei: priceWei.toString(),
             resource: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
-            description: `Payment for ${resource.title}`,
-            mimeType: resource.type === 'IMAGE' ? 'image/png' : 'application/json',
-            maxTimeoutSeconds: 3600,
-            extra: {
-                merchantAddress: resource.user.walletAddress,
-                resourceId: resource.id,
-                chainId: 11155111,
-                privacyFeatures: ['shielded-address', 'on-chain-escrow', 'chainlink-automation'],
-                complianceEngine: 'chainlink-ace',
-            }
+            description: `Payment for: ${resource.title}`,
         };
 
-        // 3. No payment header => return 402
+        // 2. No X-Payment → return 402 (optionally create on-chain escrow)
         if (!paymentHeaderRaw) {
+            let escrowCreated: { key: string; txHash: string } | null = null;
+
+            // If agent provided their address and resource is paid, create the escrow on-chain
+            if (agentAddress && resource.price > 0) {
+                try {
+                    const key = generateEscrowKey(resource.id, agentAddress);
+                    const holdDurationSeconds = (resource.autoApprovalMinutes || 60) * 60;
+
+                    const { txHash } = await createEscrowOnChain(
+                        key,
+                        resource.user.walletAddress,
+                        agentAddress,
+                        priceWei,
+                        holdDurationSeconds
+                    );
+
+                    // Pre-create a pending transaction record to track this escrow
+                    const receiptCode = `ESC-${Date.now().toString(36).toUpperCase()}`;
+                    await prisma.transaction.create({
+                        data: {
+                            userId: resource.userId,
+                            resourceId: resource.id,
+                            agentId: agentAddress,
+                            amount: resource.price,
+                            network: resource.network,
+                            token: resource.token,
+                            status: 'PENDING',
+                            receiptCode,
+                            autoSettleAt: new Date(Date.now() + holdDurationSeconds * 1000),
+                            expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                            paymentTransactionId: key,   // escrow key stored here
+                        },
+                    });
+
+                    escrowCreated = { key, txHash };
+                    console.log(`[Gateway] Created on-chain escrow key=${key} for resource=${resource.id}`);
+                } catch (err: any) {
+                    // Facilitator key not configured or RPC error — degrade gracefully
+                    console.warn(`[Gateway] Could not create on-chain escrow: ${err.message}`);
+                }
+            }
+
+            // Free resources — deliver directly
+            if (resource.price === 0) {
+                return res.json({
+                    success: true,
+                    free: true,
+                    title: resource.title,
+                    type: resource.type,
+                    data: resource.url || resource.imageData,
+                });
+            }
+
             return res.status(402).json({
                 error: 'Payment Required',
                 paymentRequirements,
-                instructions: {
-                    step1: `Call deposit("${resource.id}", "${resource.user.walletAddress}") on contract ${ESCROW_CONTRACT_ADDRESS} with ${resource.price} ETH`,
-                    step2: 'Encode {version:1, scheme:"chainlink-escrow", payload:{escrowId, txHash, sender}} as base64',
-                    step3: 'Retry this GET request with X-Payment header containing the base64 string',
-                    step4: 'After receiving the resource, call settle(escrowId) on the contract to release funds, or dispute(escrowId, reason) to freeze',
-                    contractABI: 'See /api/gateway/abi for the contract ABI',
-                    chainlinkAutomation: 'If you do nothing, Chainlink Automation auto-settles after the deadline',
-                }
+                ...(escrowCreated
+                    ? {
+                          escrow: {
+                              key: escrowCreated.key,
+                              contract: ESCROW_CONTRACT_ADDRESS,
+                              createEscrowTx: escrowCreated.txHash,
+                          },
+                          instructions: {
+                              step1: `Call deposit("${escrowCreated.key}") on contract ${ESCROW_CONTRACT_ADDRESS} and send ${resource.price} ETH`,
+                              step2: 'Build X-Payment header: btoa(JSON.stringify({version:1,scheme:"chainlink-escrow",payload:{key,txHash,sender}}))',
+                              step3: 'Retry this GET request with the X-Payment header',
+                              step4: 'After receiving resource, call requestSettlement(key) on the contract',
+                          },
+                      }
+                    : {
+                          instructions: {
+                              step0: 'Send X-Agent-Address header with your wallet address so the backend can create your escrow',
+                              note: 'Without an agent address, you must create the escrow manually via the contract',
+                          },
+                      }),
             });
         }
 
-        // 4. Parse payment header
+        // 3. Parse X-Payment header
         const header = parsePaymentHeader(paymentHeaderRaw);
 
-        if (!header || header.scheme !== 'chainlink-escrow' || header.payload?.escrowId === undefined) {
+        if (!header || header.scheme !== 'chainlink-escrow' || !header.payload?.key) {
             return res.status(402).json({
-                error: 'Invalid payment header. Use scheme "chainlink-escrow" with escrowId.',
-                paymentRequirements
+                error: 'Invalid payment header. Expected scheme "chainlink-escrow" with payload.key (bytes32).',
+                paymentRequirements,
             });
         }
 
-        console.log(`[Gateway] Verifying on-chain escrow #${header.payload.escrowId} for: ${resource.title}`);
+        const escrowKey = header.payload.key;
+        console.log(`[Gateway] Verifying deposit for escrow key=${escrowKey}, resource=${resource.title}`);
 
-        // 5. Verify on-chain deposit
-        const verification = await verifyDeposit(
-            header.payload.escrowId,
-            resource.id,
-            priceWei
-        );
+        // 4. Verify deposit on-chain via lockedForResource[key]
+        const verification = await verifyDeposit(escrowKey, priceWei);
 
         if (!verification.isValid) {
             return res.status(402).json({
-                error: 'Deposit verification failed',
+                error: 'Deposit not found or insufficient',
                 details: verification.message,
-                paymentRequirements
+                paymentRequirements,
             });
         }
 
-        // 6. Create DB record linking on-chain escrow to our system
-        const receiptCode = `RCP-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        const autoSettleAt = verification.escrow
-            ? new Date(verification.escrow.deadline * 1000)
-            : new Date(Date.now() + (resource.autoApprovalMinutes || 60) * 60 * 1000);
+        // 5. Find pre-created transaction record (if exists) or create a new one
+        const receiptCode = `RCP-${Date.now().toString(36).toUpperCase()}`;
+        const autoSettleAt = new Date(Date.now() + (resource.autoApprovalMinutes || 60) * 60 * 1000);
 
-        const tx = await prisma.transaction.create({
-            data: {
-                userId: resource.userId,
+        let tx = await prisma.transaction.findFirst({
+            where: {
                 resourceId: resource.id,
-                agentId: header.payload.sender || verification.escrow?.agent || 'unknown',
-                amount: resource.price,
-                network: resource.network,
-                token: resource.token,
+                paymentTransactionId: escrowKey,
                 status: 'PENDING',
-                receiptCode: receiptCode,
-                autoSettleAt: autoSettleAt,
-                expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                paymentTransactionId: header.payload.txHash || null,
-                paymentHeader: paymentHeaderRaw,
-            }
+            },
         });
 
-        console.log(`[Gateway] Escrow verified on-chain. DB record: ${tx.id}, receipt: ${tx.receiptCode}`);
+        if (tx) {
+            // Update existing record with actual payment header
+            tx = await prisma.transaction.update({
+                where: { id: tx.id },
+                data: { paymentHeader: paymentHeaderRaw },
+            });
+        } else {
+            // Create fresh record (agent skipped the pre-escrow step)
+            tx = await prisma.transaction.create({
+                data: {
+                    userId: resource.userId,
+                    resourceId: resource.id,
+                    agentId: header.payload.sender || 'unknown',
+                    amount: resource.price,
+                    network: resource.network,
+                    token: resource.token,
+                    status: 'PENDING',
+                    receiptCode,
+                    autoSettleAt,
+                    expiryAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    paymentTransactionId: escrowKey,
+                    paymentHeader: paymentHeaderRaw,
+                },
+            });
+        }
 
-        // 7. Deliver resource
+        console.log(`[Gateway] Deposit verified. Delivering resource. tx=${tx.id}`);
+
+        // 6. Deliver resource
         if (resource.type === 'IMAGE' && resource.imageData) {
             const base64Data = resource.imageData.replace(/^data:image\/\w+;base64,/, '');
             const img = Buffer.from(base64Data, 'base64');
@@ -161,10 +240,9 @@ export const accessResource = async (req: Request, res: Response) => {
                 'Content-Length': img.length,
                 'X-Transaction-ID': tx.id,
                 'X-Receipt-Code': tx.receiptCode,
-                'X-Escrow-Id': header.payload.escrowId.toString(),
+                'X-Escrow-Key': escrowKey,
                 'X-Escrow-Contract': ESCROW_CONTRACT_ADDRESS,
                 'X-Auto-Settle-At': autoSettleAt.toISOString(),
-                'X-Escrow-Status': 'PENDING',
             });
             return res.end(img);
         }
@@ -174,25 +252,15 @@ export const accessResource = async (req: Request, res: Response) => {
             transactionId: tx.id,
             receiptCode: tx.receiptCode,
             escrow: {
-                escrowId: header.payload.escrowId,
+                key: escrowKey,
                 contractAddress: ESCROW_CONTRACT_ADDRESS,
-                status: 'PENDING',
                 autoSettleAt: autoSettleAt.toISOString(),
-                chainlinkAutomation: 'Auto-settles if agent takes no action by deadline',
-            },
-            privacy: {
-                features: ['shielded-address', 'on-chain-escrow', 'chainlink-automation'],
-                compliance: 'chainlink-ace',
-            },
-            settlement: {
-                toSettle: `Call settle(${header.payload.escrowId}) on ${ESCROW_CONTRACT_ADDRESS}`,
-                toDispute: `Call dispute(${header.payload.escrowId}, "reason") on ${ESCROW_CONTRACT_ADDRESS}`,
+                note: 'Call requestSettlement(key) on the contract when satisfied, then POST /api/gateway/settle',
             },
             title: resource.title,
             type: resource.type,
-            data: resource.url || resource.imageData
+            data: resource.url || resource.imageData,
         });
-
     } catch (error) {
         console.error('[Gateway] Access error:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -202,23 +270,25 @@ export const accessResource = async (req: Request, res: Response) => {
 /**
  * POST /api/gateway/settle
  *
- * Agent notifies the backend that they've settled on-chain.
- * The backend verifies the on-chain state and updates the DB record.
+ * Agent notifies that they've called requestSettlement(key) on-chain.
+ * The backend (facilitator) then calls finalizeSettlement(key, true) to pay the merchant.
+ *
+ * Body: { transactionId, status: "SETTLED" | "DISPUTED", reason? }
  */
 export const settleTransaction = async (req: Request, res: Response) => {
     try {
-        const { transactionId, escrowId, status, reason } = req.body;
+        const { transactionId, status, reason } = req.body;
 
         if (!transactionId || !['SETTLED', 'DISPUTED'].includes(status)) {
             return res.status(400).json({
-                error: 'Invalid settlement request. Provide transactionId and status (SETTLED or DISPUTED).',
-                note: 'Settlement happens on-chain. Call settle(escrowId) or dispute(escrowId, reason) on the escrow contract first.'
+                error: 'Provide transactionId and status (SETTLED or DISPUTED).',
+                note: 'Call requestSettlement(key) or raiseDispute(key) on the contract first.',
             });
         }
 
         const transaction = await prisma.transaction.findUnique({
             where: { id: transactionId },
-            include: { user: true, resource: true }
+            include: { resource: true },
         });
 
         if (!transaction) {
@@ -229,90 +299,61 @@ export const settleTransaction = async (req: Request, res: Response) => {
             return res.status(400).json({ error: `Transaction already finalized: ${transaction.status}` });
         }
 
-        console.log(`[Gateway] Settlement notification: status=${status}, tx=${transactionId}`);
+        const escrowKey = transaction.paymentTransactionId;
 
-        // If escrowId provided, verify on-chain state
-        if (escrowId !== undefined) {
-            try {
-                const onChainEscrow = await getEscrowDetails(escrowId);
-                const onChainStatus = getStatusLabel(onChainEscrow.status);
-                console.log(`[Gateway] On-chain escrow #${escrowId} status: ${onChainStatus}`);
-
-                // Map on-chain status to DB status
-                if (onChainEscrow.status === EscrowStatus.SETTLED || onChainEscrow.status === EscrowStatus.AUTO_SETTLED) {
-                    const updatedTx = await prisma.transaction.update({
-                        where: { id: transactionId },
-                        data: { status: 'SETTLED' }
-                    });
-                    return res.json({
-                        success: true,
-                        status: updatedTx.status,
-                        onChainStatus: onChainStatus,
-                        message: onChainEscrow.status === EscrowStatus.AUTO_SETTLED
-                            ? 'Auto-settled by Chainlink Automation'
-                            : 'Funds released to merchant on-chain'
-                    });
-                }
-
-                if (onChainEscrow.status === EscrowStatus.DISPUTED) {
-                    const updatedTx = await prisma.transaction.update({
-                        where: { id: transactionId },
-                        data: {
-                            status: 'REFUND_REQUESTED',
-                            encryptedDisputeReason: onChainEscrow.disputeReason || reason || null
-                        }
-                    });
-                    return res.json({
-                        success: true,
-                        status: updatedTx.status,
-                        onChainStatus: onChainStatus,
-                        message: 'Dispute recorded on-chain. Awaiting resolution.'
-                    });
-                }
-
-                if (onChainEscrow.status === EscrowStatus.REFUNDED) {
-                    const updatedTx = await prisma.transaction.update({
-                        where: { id: transactionId },
-                        data: { status: 'REFUNDED' }
-                    });
-                    return res.json({
-                        success: true,
-                        status: updatedTx.status,
-                        onChainStatus: onChainStatus,
-                        message: 'Funds refunded to agent on-chain.'
-                    });
-                }
-            } catch (err: any) {
-                console.warn(`[Gateway] Could not verify on-chain state: ${err.message}`);
-            }
-        }
-
-        // Fallback: trust the agent's self-report if on-chain check fails/unavailable
         if (status === 'SETTLED') {
+            // Facilitator finalizes on-chain: pays merchant
+            let settleTxHash: string | null = null;
+            if (escrowKey) {
+                try {
+                    const result = await finalizeSettlementOnChain(escrowKey, true);
+                    settleTxHash = result.txHash;
+                    console.log(`[Gateway] finalizeSettlement (pay merchant) tx: ${settleTxHash}`);
+                } catch (err: any) {
+                    // Log and continue — DB will still update; on-chain tx may need manual retry
+                    console.error(`[Gateway] finalizeSettlement failed: ${err.message}`);
+                }
+            }
+
             const updatedTx = await prisma.transaction.update({
                 where: { id: transactionId },
-                data: { status: 'SETTLED' }
+                data: { status: 'SETTLED' },
             });
+
             return res.json({
                 success: true,
                 status: updatedTx.status,
-                message: 'Settlement recorded. Verify on-chain for confirmation.'
+                settlementTx: settleTxHash,
+                message: 'Funds released to merchant on-chain.',
             });
         } else {
+            // DISPUTED: facilitator finalizes on-chain: refunds agent
+            let refundTxHash: string | null = null;
+            if (escrowKey) {
+                try {
+                    const result = await finalizeSettlementOnChain(escrowKey, false);
+                    refundTxHash = result.txHash;
+                    console.log(`[Gateway] finalizeSettlement (refund agent) tx: ${refundTxHash}`);
+                } catch (err: any) {
+                    console.error(`[Gateway] finalizeSettlement (refund) failed: ${err.message}`);
+                }
+            }
+
             const updatedTx = await prisma.transaction.update({
                 where: { id: transactionId },
                 data: {
                     status: 'REFUND_REQUESTED',
-                    encryptedDisputeReason: reason || null
-                }
+                    encryptedDisputeReason: reason || null,
+                },
             });
+
             return res.json({
                 success: true,
                 status: updatedTx.status,
-                message: 'Dispute recorded. Call dispute() on the escrow contract to freeze funds on-chain.'
+                refundTx: refundTxHash,
+                message: 'Dispute recorded. Funds returned to agent on-chain.',
             });
         }
-
     } catch (error) {
         console.error('[Gateway] Settlement error:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -322,65 +363,60 @@ export const settleTransaction = async (req: Request, res: Response) => {
 /**
  * POST /api/gateway/resolve-dispute
  *
- * Merchant resolves a disputed transaction (requires auth).
- * Should call resolveDispute(escrowId, refund) on-chain first, then notify backend.
+ * Merchant resolves a disputed transaction (auth required).
+ * If the dispute should be rejected (merchant wins), facilitator pays merchant on-chain.
+ * If refunded (agent wins), the DISPUTED→finalizeSettlement(key, false) path should have
+ * already been triggered by the agent's settle call above.
  */
 export const resolveDispute = async (req: Request, res: Response) => {
     try {
-        const { transactionId, escrowId, decision } = req.body;
+        const { transactionId, decision } = req.body;
         const userId = (req as any).userId;
 
         if (!transactionId || !['REFUND', 'REJECT'].includes(decision)) {
             return res.status(400).json({
-                error: 'Invalid resolve request. Provide transactionId and decision (REFUND or REJECT).',
-                note: 'Call resolveDispute(escrowId, true/false) on the escrow contract first.'
+                error: 'Provide transactionId and decision (REFUND or REJECT).',
             });
         }
 
         const transaction = await prisma.transaction.findUnique({
             where: { id: transactionId },
-            include: { user: true }
+            include: { user: true },
         });
 
-        if (!transaction) {
-            return res.status(404).json({ error: 'Transaction not found' });
-        }
-
-        if (transaction.userId !== userId) {
-            return res.status(403).json({ error: 'Unauthorized: you do not own this transaction' });
-        }
-
+        if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+        if (transaction.userId !== userId) return res.status(403).json({ error: 'Unauthorized' });
         if (transaction.status !== 'REFUND_REQUESTED') {
             return res.status(400).json({ error: `Transaction is not in dispute: ${transaction.status}` });
         }
 
-        console.log(`[Gateway] Resolving dispute: decision=${decision}, tx=${transactionId}`);
+        const escrowKey = transaction.paymentTransactionId;
+        let onChainTxHash: string | null = null;
 
-        // Verify on-chain state if escrowId provided
-        if (escrowId !== undefined) {
+        if (decision === 'REJECT' && escrowKey) {
+            // Merchant wins dispute → pay merchant
             try {
-                const onChainEscrow = await getEscrowDetails(escrowId);
-                const onChainStatus = getStatusLabel(onChainEscrow.status);
-                console.log(`[Gateway] On-chain escrow #${escrowId} status: ${onChainStatus}`);
+                const result = await finalizeSettlementOnChain(escrowKey, true);
+                onChainTxHash = result.txHash;
             } catch (err: any) {
-                console.warn(`[Gateway] Could not verify on-chain state: ${err.message}`);
+                console.error(`[Gateway] finalizeSettlement (dispute rejected) failed: ${err.message}`);
             }
         }
 
         const finalStatus = decision === 'REFUND' ? 'REFUNDED' : 'SETTLED';
         const updatedTx = await prisma.transaction.update({
             where: { id: transactionId },
-            data: { status: finalStatus }
+            data: { status: finalStatus },
         });
 
         return res.json({
             success: true,
             status: updatedTx.status,
+            onChainTx: onChainTxHash,
             message: decision === 'REFUND'
-                ? 'Refund processed. Ensure resolveDispute(escrowId, true) was called on-chain.'
-                : 'Dispute rejected. Ensure resolveDispute(escrowId, false) was called on-chain.'
+                ? 'Dispute resolved: agent refunded.'
+                : 'Dispute rejected: funds released to merchant.',
         });
-
     } catch (error) {
         console.error('[Gateway] Dispute resolution error:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -390,35 +426,28 @@ export const resolveDispute = async (req: Request, res: Response) => {
 /**
  * GET /api/gateway/escrow/:escrowId
  *
- * Check on-chain escrow status.
+ * Check how much ETH is currently locked for a given escrow key.
+ * Route param is the bytes32 key (hex string).
  */
 export const getEscrowStatus = async (req: Request, res: Response) => {
     try {
-        const escrowId = parseInt(req.params.escrowId as string);
+        const key = req.params.escrowId as string;   // param name kept for route compatibility
 
-        if (isNaN(escrowId)) {
-            return res.status(400).json({ error: 'Invalid escrow ID' });
+        if (!key || !key.startsWith('0x') || key.length !== 66) {
+            return res.status(400).json({
+                error: 'Invalid escrow key. Provide a 0x-prefixed bytes32 hex string (66 chars).',
+            });
         }
 
-        const escrow = await getEscrowDetails(escrowId);
+        const locked = await getLockedAmount(key);
 
         return res.json({
-            escrowId,
+            key,
             contractAddress: getEscrowContractAddress(),
-            agent: escrow.agent,
-            merchant: escrow.merchant,
-            amount: escrow.amount.toString(),
-            amountETH: Number(escrow.amount) / 1e18,
-            resourceId: escrow.resourceId,
-            status: getStatusLabel(escrow.status),
-            createdAt: new Date(escrow.createdAt * 1000).toISOString(),
-            deadline: new Date(escrow.deadline * 1000).toISOString(),
-            disputeReason: escrow.disputeReason || null,
-            chainlinkAutomation: escrow.status === EscrowStatus.PENDING
-                ? `Will auto-settle at ${new Date(escrow.deadline * 1000).toISOString()}`
-                : null,
+            lockedWei: locked.toString(),
+            lockedETH: Number(locked) / 1e18,
+            isFunded: locked > 0n,
         });
-
     } catch (error: any) {
         console.error('[Gateway] Escrow status error:', error.message);
         return res.status(500).json({ error: 'Failed to fetch escrow status' });

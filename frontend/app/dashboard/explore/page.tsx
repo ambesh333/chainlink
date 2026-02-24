@@ -1,20 +1,11 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getApiUrl } from '@/lib/config';
 import {
     Globe, Image, Video, ExternalLink, Shield, Star, AlertTriangle,
-    TrendingUp,
+    TrendingUp, Loader2,
 } from 'lucide-react';
-
-const DUMMY_PUBLIC_RESOURCES = [
-    { id: '1', title: 'Ethereum Price Feed Dataset', description: 'Historical ETH/USD price data from Chainlink oracles, updated every 5 minutes.', type: 'LINK' as const, price: 0.002, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-20', trustScore: 92, trustLabel: 'Excellent' },
-    { id: '2', title: 'DeFi Analytics Report Q1 2026', description: 'Comprehensive Q1 DeFi market analysis covering TVL, volume, and protocol metrics.', type: 'IMAGE' as const, price: 0.005, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-18', trustScore: 88, trustLabel: 'Excellent' },
-    { id: '3', title: 'Smart Contract Audit Pack', description: 'Collection of common smart contract vulnerability patterns and remediation guides.', type: 'LINK' as const, price: 0.001, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-15', trustScore: 76, trustLabel: 'Good' },
-    { id: '4', title: 'Chainlink Oracle Integration Guide', description: 'Step-by-step guide for integrating Chainlink price feeds into smart contracts.', type: 'LINK' as const, price: 0.003, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-08', trustScore: 95, trustLabel: 'Excellent' },
-    { id: '5', title: 'MEV Bot Strategy Video Tutorial', description: 'Advanced tutorial on MEV extraction strategies for automated agents.', type: 'VIDEO' as const, price: 0.0085, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-10', trustScore: 61, trustLabel: 'Average' },
-    { id: '6', title: 'Gas Optimization Dataset', description: 'Benchmark dataset of gas costs for common EVM operations across 50+ protocols.', type: 'IMAGE' as const, price: 0.0015, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-01', trustScore: 84, trustLabel: 'Good' },
-    { id: '7', title: 'On-Chain Governance Dataset', description: 'Comprehensive voting and governance data from major DAOs including Uniswap, Compound, and Aave.', type: 'LINK' as const, price: 0.004, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-01-28', trustScore: 79, trustLabel: 'Good' },
-    { id: '8', title: 'NFT Market Trends Report', description: 'Weekly NFT marketplace analytics covering top collections, floor prices, and volume.', type: 'IMAGE' as const, price: 0, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-01-25', trustScore: 55, trustLabel: 'Average' },
-];
 
 interface PublicResource {
     id: string;
@@ -117,8 +108,50 @@ function ExploreCard({ resource }: { resource: PublicResource }) {
     );
 }
 
+function ExploreSkeleton() {
+    return (
+        <div className="bg-[#0a0a0f] rounded-2xl border border-white/5 p-6 animate-pulse">
+            <div className="flex justify-between mb-4">
+                <div className="flex gap-3">
+                    <div className="w-10 h-10 bg-white/5 rounded-lg" />
+                    <div className="w-16 h-4 bg-white/5 rounded mt-3" />
+                </div>
+                <div className="w-20 h-6 bg-white/5 rounded-full" />
+            </div>
+            <div className="space-y-3 mb-6">
+                <div className="w-3/4 h-6 bg-white/5 rounded" />
+                <div className="w-full h-4 bg-white/5 rounded" />
+            </div>
+            <div className="flex gap-2 mb-4">
+                <div className="w-14 h-5 bg-white/5 rounded-full" />
+                <div className="w-14 h-5 bg-white/5 rounded-full" />
+            </div>
+            <div className="border-t border-white/5 pt-4 flex justify-between">
+                <div className="w-24 h-8 bg-white/5 rounded" />
+                <div className="w-20 h-8 bg-white/5 rounded-xl" />
+            </div>
+        </div>
+    );
+}
+
 export default function ExplorePage() {
-    const resources = DUMMY_PUBLIC_RESOURCES;
+    const [resources, setResources] = useState<PublicResource[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const API_URL = getApiUrl();
+        setIsLoading(true);
+        setError(null);
+        fetch(`${API_URL}/explore`)
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to load resources');
+                return res.json();
+            })
+            .then(data => setResources(data.resources ?? []))
+            .catch(err => setError(err.message))
+            .finally(() => setIsLoading(false));
+    }, []);
 
     return (
         <div>
@@ -134,16 +167,43 @@ export default function ExplorePage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <div className="w-2 h-2 rounded-full bg-[#4CAF50] animate-pulse" />
-                    {resources.length} resources available
+                    {isLoading ? (
+                        <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                        <>
+                            <div className="w-2 h-2 rounded-full bg-[#4CAF50] animate-pulse" />
+                            {resources.length} resources available
+                        </>
+                    )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {resources.map((resource) => (
-                    <ExploreCard key={resource.id} resource={resource} />
-                ))}
-            </div>
+            {error && (
+                <div className="bg-[#dc2626]/10 border border-[#dc2626]/30 text-[#ef4444] p-4 rounded-xl mb-6">
+                    {error}
+                </div>
+            )}
+
+            {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <ExploreSkeleton key={i} />
+                    ))}
+                </div>
+            ) : resources.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 bg-[#0a0a0f] rounded-2xl border border-white/5">
+                    <div className="p-4 bg-white/5 rounded-full mb-4">
+                        <Globe size={32} className="text-gray-600" />
+                    </div>
+                    <p className="text-gray-400 font-medium">No resources available yet</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {resources.map((resource) => (
+                        <ExploreCard key={resource.id} resource={resource} />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

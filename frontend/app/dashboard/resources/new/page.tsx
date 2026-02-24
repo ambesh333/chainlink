@@ -207,7 +207,7 @@ export default function NewResourcePage() {
                                     value={price}
                                     onChange={(e) => setPrice(e.target.value)}
                                     min="0"
-                                    step="0.001"
+                                    step="0.00001"
                                     className="w-full px-5 py-4 bg-black/50 border border-white/10 rounded-xl text-[#F4F4F5] placeholder-gray-600 focus:outline-none focus:border-[#375BD2] transition-all font-mono"
                                 />
                             </div>
