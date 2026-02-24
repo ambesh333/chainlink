@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Package, Home } from 'lucide-react';
+import { LayoutDashboard, Package, Home, Globe, AlertOctagon, Terminal } from 'lucide-react';
 import { ConnectWalletButton } from '@/components/ConnectWalletButton';
 import { useAuth } from '@/components/AuthContext';
 import { usePathname } from 'next/navigation';
@@ -18,6 +18,9 @@ export default function DashboardLayout({
         { href: '/', label: 'Home', icon: Home },
         { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
         { href: '/dashboard/resources', label: 'My Resources', icon: Package },
+        { href: '/dashboard/explore', label: 'Explore', icon: Globe },
+        { href: '/dashboard/disputes', label: 'Disputes', icon: AlertOctagon },
+        { href: '/dashboard/demo', label: 'Demo', icon: Terminal },
     ];
 
     return (

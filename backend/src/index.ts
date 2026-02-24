@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3001;
 import authRoutes from './routes/authRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
+import exploreRoutes from './routes/exploreRoutes';
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -31,14 +32,20 @@ app.use(cors({
         }
     },
     credentials: true,
+    exposedHeaders: [
+        'X-Receipt-Code', 'X-Auto-Settle-At', 'X-Transaction-ID',
+        'X-Payment-Required', 'X-Payment-Amount', 'X-Payment-Token',
+        'X-Payment-Network', 'X-Resource-ID', 'X-Escrow-Id', 'X-Escrow-Contract',
+    ],
 }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased for base64 image uploads
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/gateway', gatewayRoutes);
+app.use('/api/explore', exploreRoutes);  // Public routes for AI agent discovery
 
 // Health check
 app.get('/health', (req, res) => {

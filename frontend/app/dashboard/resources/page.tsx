@@ -1,9 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { getApiUrl } from '@/lib/config';
 import { useAuth } from '@/components/AuthContext';
-import { Package, Plus, ExternalLink, Image, Video, Loader2, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Package, Plus, ExternalLink, Image, Video, Trash2, Copy, Check, AlertTriangle, Loader2 } from 'lucide-react';
+
+const DUMMY_RESOURCES = [
+    { id: '1', title: 'Ethereum Price Feed Dataset', description: 'Historical ETH/USD price data from Chainlink oracles, updated every 5 minutes.', type: 'LINK' as const, price: 0.002, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-20' },
+    { id: '2', title: 'DeFi Analytics Report Q1 2026', description: 'Comprehensive Q1 DeFi market analysis covering TVL, volume, and protocol metrics.', type: 'IMAGE' as const, price: 0.005, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-18' },
+    { id: '3', title: 'Smart Contract Audit Pack', description: 'Collection of common smart contract vulnerability patterns and remediation guides.', type: 'LINK' as const, price: 0.001, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-15' },
+    { id: '4', title: 'MEV Bot Strategy Video Tutorial', description: 'Advanced tutorial on MEV extraction strategies for automated agents.', type: 'VIDEO' as const, price: 0.0085, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: false, createdAt: '2026-02-10' },
+    { id: '5', title: 'Chainlink Oracle Integration Guide', description: 'Step-by-step guide for integrating Chainlink price feeds into smart contracts.', type: 'LINK' as const, price: 0.003, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-08' },
+    { id: '6', title: 'Gas Optimization Dataset', description: 'Benchmark dataset of gas costs for common EVM operations across 50+ protocols.', type: 'IMAGE' as const, price: 0.0015, url: null, network: 'SEPOLIA' as const, token: 'ETH' as const, isActive: true, createdAt: '2026-02-01' },
+];
 
 interface Resource {
     id: string;
@@ -167,60 +176,21 @@ function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: (i
 
 export default function ResourcesPage() {
     const { isAuthenticated } = useAuth();
-    const [resources, setResources] = useState<Resource[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [resources, setResources] = useState<Resource[]>(DUMMY_RESOURCES);
+    const [isLoading] = useState(false);
+    const [error] = useState<string | null>(null);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-
-    useEffect(() => {
-        if (isAuthenticated) {
-            fetchResources();
-        }
-    }, [isAuthenticated]);
-
-    const fetchResources = async () => {
-        try {
-            setIsLoading(true);
-            const API_URL = getApiUrl();
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch(`${API_URL}/resources`, {
-                credentials: 'include',
-                headers: token ? { 'Authorization': `Bearer ${token}` } : undefined
-            });
-
-            if (!res.ok) throw new Error('Failed to fetch resources');
-
-            const data = await res.json();
-            setResources(data.resources);
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const confirmDelete = async () => {
         if (!deleteId) return;
         setIsDeleting(true);
-
-        try {
-            const API_URL = getApiUrl();
-            const res = await fetch(`${API_URL}/resources/${deleteId}`, {
-                method: 'DELETE',
-                credentials: 'include',
-                headers: localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : undefined
-            });
-
-            if (!res.ok) throw new Error('Failed to delete resource');
-
+        // Simulate deletion from dummy data
+        setTimeout(() => {
             setResources(prev => prev.filter(r => r.id !== deleteId));
             setDeleteId(null);
-        } catch (e: any) {
-            alert(e.message);
-        } finally {
             setIsDeleting(false);
-        }
+        }, 600);
     };
 
     if (!isAuthenticated) return null;
