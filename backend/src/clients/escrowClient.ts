@@ -146,6 +146,56 @@ export async function getLockedAmount(key: string): Promise<bigint> {
     return await contract.lockedForResource(key);
 }
 
+/**
+ * Escrow state enum matching the on-chain EscrowState.
+ */
+export enum EscrowState {
+    Created = 0,
+    Funded = 1,
+    SettlementRequested = 2,
+    Disputed = 3,
+    Settled = 4,
+    Released = 5,
+    Cancelled = 6,
+}
+
+export interface OnChainEscrow {
+    key: string;
+    merchant: string;
+    agent: string;
+    asset: string;
+    amount: bigint;
+    fundedAt: bigint;
+    expiry: bigint;
+    holdDuration: bigint;
+    state: EscrowState;
+    agentRequestedSettlement: boolean;
+    agentRaisedDispute: boolean;
+}
+
+/**
+ * Fetch the full escrow struct from the on-chain getEscrow() view function.
+ * Returns typed escrow data for pre-finalization verification.
+ */
+export async function getEscrowOnChain(key: string): Promise<OnChainEscrow> {
+    const contract = getReadContract();
+    const result = await contract.getEscrow(key);
+
+    return {
+        key: result.key,
+        merchant: result.merchant,
+        agent: result.agent,
+        asset: result.asset,
+        amount: BigInt(result.amount),
+        fundedAt: BigInt(result.fundedAt),
+        expiry: BigInt(result.expiry),
+        holdDuration: BigInt(result.holdDuration),
+        state: Number(result.state) as EscrowState,
+        agentRequestedSettlement: result.agentRequestedSettlement,
+        agentRaisedDispute: result.agentRaisedDispute,
+    };
+}
+
 export function getEscrowContractAddress(): string {
     return ESCROW_CONTRACT_ADDRESS;
 }

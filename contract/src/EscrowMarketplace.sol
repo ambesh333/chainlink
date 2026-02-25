@@ -37,6 +37,9 @@ contract EscrowMarketplace {
         bool agentRaisedDispute;
     }
 
+    event SettlementRequested(bytes32 indexed key, address indexed agent);
+    event SettlementFinalized(bytes32 indexed key, address indexed merchant, bool payMerchant);
+
     address public owner;
     mapping(bytes32 => Escrow) private escrows;
     mapping(bytes32 => bool) private exists;
@@ -167,6 +170,8 @@ contract EscrowMarketplace {
 
         e.agentRequestedSettlement = true;
         e.state = EscrowState.SettlementRequested;
+
+        emit SettlementRequested(key, msg.sender);
     }
 
     function raiseDispute(bytes32 key) external escrowExists(key) {
@@ -206,6 +211,16 @@ contract EscrowMarketplace {
         lockedForResource[key] -= e.amount;
 
         e.state = EscrowState.Settled;
+
+        emit SettlementFinalized(key, e.merchant, payMerchant);
+    }
+
+    // ---------------------------------------------------------
+    // Get Escrow (public getter)
+    // ---------------------------------------------------------
+
+    function getEscrow(bytes32 key) external view escrowExists(key) returns (Escrow memory) {
+        return escrows[key];
     }
 
     // ---------------------------------------------------------

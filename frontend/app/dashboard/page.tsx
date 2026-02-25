@@ -1,25 +1,90 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, Globe, AlertOctagon, TrendingUp, Zap, Shield, ArrowRight, Terminal } from 'lucide-react';
+import { Package, Globe, TrendingUp, Zap, Shield, ArrowRight, Terminal, Loader2 } from 'lucide-react';
+import { useAuth } from '@/components/AuthContext';
+import { getApiUrl } from '@/lib/config';
 
-const DUMMY_STATS = {
-    totalResources: 12,
-    activeResources: 9,
-    totalTransactions: 248,
-    revenue: '0.04821',
-    pendingDisputes: 2,
-    trustScore: 87,
-};
+interface DashboardStats {
+    totalResources: number;
+    activeResources: number;
+    totalTransactions: number;
+    revenue: string;
+    pendingDisputes: number;
+    trustScore: number;
+    trustLabel: string;
+    recentTransactions: RecentTransaction[];
+}
 
-const DUMMY_RECENT = [
-    { id: '1', title: 'Ethereum Price Feed Dataset', type: 'LINK', price: 0.002, status: 'SETTLED', date: '2 hours ago' },
-    { id: '2', title: 'DeFi Analytics Report Q1', type: 'IMAGE', price: 0.005, status: 'PENDING', date: '5 hours ago' },
-    { id: '3', title: 'Smart Contract Audit Pack', type: 'LINK', price: 0.001, status: 'SETTLED', date: '1 day ago' },
-    { id: '4', title: 'MEV Bot Strategy Video', type: 'VIDEO', price: 0.0085, status: 'DISPUTED', date: '2 days ago' },
-];
+interface RecentTransaction {
+    id: string;
+    title: string;
+    type: string;
+    price: number;
+    status: string;
+    date: string;
+}
+
+function timeAgo(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diffMs = now - then;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+}
 
 export default function DashboardPage() {
+    const { getToken } = useAuth();
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const API_URL = getApiUrl();
+                const token = getToken();
+                const res = await fetch(`${API_URL}/resources/stats`, {
+                    credentials: 'include',
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setStats(data);
+                }
+            } catch (e) {
+                console.error('Failed to fetch dashboard stats:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, [getToken]);
+
+    const totalResources = stats?.totalResources ?? 0;
+    const activeResources = stats?.activeResources ?? 0;
+    const totalTransactions = stats?.totalTransactions ?? 0;
+    const revenue = stats?.revenue ?? '0.00000';
+    const pendingDisputes = stats?.pendingDisputes ?? 0;
+    const trustScore = stats?.trustScore ?? 0;
+    const trustLabel = stats?.trustLabel ?? 'N/A';
+    const recentTransactions = stats?.recentTransactions ?? [];
+
+    const activePercent = totalResources > 0 ? Math.round((activeResources / totalResources) * 100) : 0;
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 size={32} className="animate-spin text-[#375BD2]" />
+            </div>
+        );
+    }
+
     return (
         <div>
             {/* Header */}
@@ -37,11 +102,11 @@ export default function DashboardPage() {
                         <Package size={16} className="text-[#375BD2]" />
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#375BD2]">{DUMMY_STATS.totalResources}</span>
+                        <span className="text-4xl font-mono font-bold text-[#375BD2]">{totalResources}</span>
                         <span className="text-sm text-gray-400">registered</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-[#375BD2] h-full" style={{ width: '75%' }} />
+                        <div className="bg-[#375BD2] h-full" style={{ width: `${Math.min(100, totalResources * 10)}%` }} />
                     </div>
                     <p className="text-xs text-gray-500 mt-2">Data assets in your portfolio</p>
                 </div>
@@ -53,11 +118,11 @@ export default function DashboardPage() {
                         <Zap size={16} className="text-[#4CAF50]" />
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#4CAF50]">{DUMMY_STATS.activeResources}</span>
+                        <span className="text-4xl font-mono font-bold text-[#4CAF50]">{activeResources}</span>
                         <span className="text-sm text-gray-400">live</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-[#4CAF50] h-full" style={{ width: '75%' }} />
+                        <div className="bg-[#4CAF50] h-full" style={{ width: `${activePercent}%` }} />
                     </div>
                     <p className="text-xs text-gray-500 mt-2">Currently available on the network</p>
                 </div>
@@ -69,13 +134,13 @@ export default function DashboardPage() {
                         <Shield size={16} className="text-[#4C8BF5]" />
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#4C8BF5]">{DUMMY_STATS.trustScore}</span>
+                        <span className="text-4xl font-mono font-bold text-[#4C8BF5]">{trustScore}</span>
                         <span className="text-sm text-gray-400">/ 100</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-[#375BD2] to-[#4C8BF5] h-full" style={{ width: `${DUMMY_STATS.trustScore}%` }} />
+                        <div className="bg-gradient-to-r from-[#375BD2] to-[#4C8BF5] h-full" style={{ width: `${trustScore}%` }} />
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">Excellent — Top 15% of merchants</p>
+                    <p className="text-xs text-gray-500 mt-2">{trustLabel}</p>
                 </div>
             </div>
 
@@ -83,17 +148,17 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Total Transactions</h3>
-                    <span className="text-3xl font-mono font-bold text-white">{DUMMY_STATS.totalTransactions}</span>
+                    <span className="text-3xl font-mono font-bold text-white">{totalTransactions}</span>
                     <p className="text-xs text-gray-500 mt-2">All-time completed purchases</p>
                 </div>
                 <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Revenue</h3>
-                    <span className="text-3xl font-mono font-bold text-white">{DUMMY_STATS.revenue} <span className="text-lg text-gray-500">ETH</span></span>
+                    <span className="text-3xl font-mono font-bold text-white">{revenue} <span className="text-lg text-gray-500">ETH</span></span>
                     <p className="text-xs text-gray-500 mt-2">Total earned from resources</p>
                 </div>
                 <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
                     <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Pending Disputes</h3>
-                    <span className="text-3xl font-mono font-bold text-yellow-400">{DUMMY_STATS.pendingDisputes}</span>
+                    <span className="text-3xl font-mono font-bold text-yellow-400">{pendingDisputes}</span>
                     <p className="text-xs text-gray-500 mt-2">Awaiting AI resolution</p>
                 </div>
             </div>
@@ -127,27 +192,36 @@ export default function DashboardPage() {
                         <TrendingUp size={18} className="text-[#375BD2]" />
                         Recent Transactions
                     </h3>
-                    <span className="text-xs text-gray-500">Demo data</span>
+                    {recentTransactions.length === 0 && (
+                        <span className="text-xs text-gray-500">No transactions yet</span>
+                    )}
                 </div>
                 <div className="divide-y divide-white/5">
-                    {DUMMY_RECENT.map((tx) => (
-                        <div key={tx.id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors">
-                            <div className={`w-2 h-2 rounded-full ${tx.status === 'SETTLED' ? 'bg-green-400' : tx.status === 'DISPUTED' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-                            <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-medium truncate">{tx.title}</p>
-                                <p className="text-gray-500 text-xs">{tx.date}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <span className="text-xs text-gray-500 uppercase">{tx.type}</span>
-                                <span className="text-white text-sm font-mono">{tx.price} ETH</span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    tx.status === 'SETTLED' ? 'bg-green-500/10 text-green-400' :
-                                    tx.status === 'DISPUTED' ? 'bg-red-500/10 text-red-400' :
-                                    'bg-yellow-500/10 text-yellow-400'
-                                }`}>{tx.status}</span>
-                            </div>
+                    {recentTransactions.length === 0 ? (
+                        <div className="px-6 py-8 text-center text-gray-500 text-sm">
+                            No transactions yet. Your transaction history will appear here.
                         </div>
-                    ))}
+                    ) : (
+                        recentTransactions.map((tx) => (
+                            <div key={tx.id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors">
+                                <div className={`w-2 h-2 rounded-full ${tx.status === 'SETTLED' ? 'bg-green-400' : tx.status === 'REFUND_REQUESTED' ? 'bg-red-400' : tx.status === 'REFUNDED' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-white text-sm font-medium truncate">{tx.title}</p>
+                                    <p className="text-gray-500 text-xs">{timeAgo(tx.date)}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xs text-gray-500 uppercase">{tx.type}</span>
+                                    <span className="text-white text-sm font-mono">{tx.price} ETH</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                        tx.status === 'SETTLED' ? 'bg-green-500/10 text-green-400' :
+                                        tx.status === 'REFUND_REQUESTED' ? 'bg-red-500/10 text-red-400' :
+                                        tx.status === 'REFUNDED' ? 'bg-red-500/10 text-red-400' :
+                                        'bg-yellow-500/10 text-yellow-400'
+                                    }`}>{tx.status === 'REFUND_REQUESTED' ? 'DISPUTED' : tx.status}</span>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         </div>

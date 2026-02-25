@@ -94,5 +94,50 @@
         "inputs": [{ "name": "key", "type": "bytes32", "internalType": "bytes32" }],
         "outputs": [],
         "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "getEscrow",
+        "inputs": [{ "name": "key", "type": "bytes32", "internalType": "bytes32" }],
+        "outputs": [
+            {
+                "name": "",
+                "type": "tuple",
+                "internalType": "struct EscrowMarketplace.Escrow",
+                "components": [
+                    { "name": "key",                      "type": "bytes32", "internalType": "bytes32" },
+                    { "name": "merchant",                 "type": "address", "internalType": "address" },
+                    { "name": "agent",                    "type": "address", "internalType": "address" },
+                    { "name": "asset",                    "type": "address", "internalType": "address" },
+                    { "name": "amount",                   "type": "uint256", "internalType": "uint256" },
+                    { "name": "fundedAt",                 "type": "uint256", "internalType": "uint256" },
+                    { "name": "expiry",                   "type": "uint256", "internalType": "uint256" },
+                    { "name": "holdDuration",             "type": "uint64",  "internalType": "uint64"  },
+                    { "name": "state",                    "type": "uint8",   "internalType": "enum EscrowMarketplace.EscrowState" },
+                    { "name": "agentRequestedSettlement", "type": "bool",    "internalType": "bool"    },
+                    { "name": "agentRaisedDispute",       "type": "bool",    "internalType": "bool"    }
+                ]
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "event",
+        "name": "SettlementRequested",
+        "inputs": [
+            { "name": "key",   "type": "bytes32", "indexed": true,  "internalType": "bytes32" },
+            { "name": "agent", "type": "address", "indexed": true,  "internalType": "address" }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "SettlementFinalized",
+        "inputs": [
+            { "name": "key",         "type": "bytes32", "indexed": true,  "internalType": "bytes32" },
+            { "name": "merchant",    "type": "address", "indexed": true,  "internalType": "address" },
+            { "name": "payMerchant", "type": "bool",    "indexed": false, "internalType": "bool"    }
+        ],
+        "anonymous": false
     }
 ]

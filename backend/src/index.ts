@@ -9,6 +9,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+import { startSettlementListener } from './services/settlementListener';
 import authRoutes from './routes/authRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
@@ -55,6 +56,9 @@ app.get('/health', (req, res) => {
 // Start server
 app.listen(PORT, () => {
     console.log(`Chainlink Agent Backend running on port ${PORT}`);
+
+    // Start on-chain settlement event listener
+    startSettlementListener();
 });
 
 // Handle shutdown

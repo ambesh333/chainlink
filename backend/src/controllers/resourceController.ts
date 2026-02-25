@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../context';
+import { calculateMerchantScore, getScoreLabel } from '../utils/scoring';
 
 interface CreateResourceBody {
     title: string;
@@ -189,5 +190,85 @@ export const deleteResource = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Delete resource error:', error);
         return res.status(500).json({ error: 'Failed to delete resource' });
+    }
+};
+
+/**
+ * GET /api/resources/stats
+ * Dashboard overview stats for the authenticated merchant
+ */
+export const getDashboardStats = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).userId;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Resource counts
+        const [totalResources, activeResources] = await Promise.all([
+            prisma.resource.count({ where: { userId } }),
+            prisma.resource.count({ where: { userId, isActive: true } }),
+        ]);
+
+        // Transaction aggregates
+        const transactions = await prisma.transaction.findMany({
+            where: { userId },
+            select: { status: true, amount: true },
+        });
+
+        const totalTransactions = transactions.length;
+        const revenue = transactions
+            .filter(t => t.status === 'SETTLED')
+            .reduce((sum, t) => sum + t.amount, 0);
+        const pendingDisputes = transactions
+            .filter(t => t.status === 'REFUND_REQUESTED')
+            .length;
+        const lostDisputes = transactions
+            .filter(t => t.status === 'REFUNDED')
+            .length;
+
+        // Trust score
+        const trustScore = calculateMerchantScore({
+            resourceCount: totalResources,
+            totalEarnings: revenue,
+            totalTransactions,
+            lostDisputes,
+            createdAt: user.createdAt,
+        });
+        const trustLabel = getScoreLabel(trustScore);
+
+        // Recent transactions (last 10)
+        const recentTransactions = await prisma.transaction.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            include: {
+                resource: { select: { title: true, type: true } },
+            },
+        });
+
+        const recent = recentTransactions.map(tx => ({
+            id: tx.id,
+            title: tx.resource?.title || 'Unknown Resource',
+            type: tx.resource?.type || 'LINK',
+            price: tx.amount,
+            status: tx.status,
+            date: tx.createdAt,
+        }));
+
+        return res.json({
+            totalResources,
+            activeResources,
+            totalTransactions,
+            revenue: revenue.toFixed(5),
+            pendingDisputes,
+            trustScore,
+            trustLabel: trustLabel.label,
+            recentTransactions: recent,
+        });
+    } catch (error) {
+        console.error('Dashboard stats error:', error);
+        return res.status(500).json({ error: 'Failed to fetch dashboard stats' });
     }
 };

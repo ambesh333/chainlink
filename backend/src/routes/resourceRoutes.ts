@@ -4,7 +4,8 @@ import {
     getResource,
     createResource,
     updateResource,
-    deleteResource
+    deleteResource,
+    getDashboardStats
 } from '../controllers/resourceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -12,6 +13,9 @@ const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+
+// GET /api/resources/stats - Dashboard overview stats
+router.get('/stats', getDashboardStats);
 
 // GET /api/resources - List all resources for user
 router.get('/', listResources);
