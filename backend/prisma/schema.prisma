@@ -92,6 +92,11 @@ model Transaction {
   paymentTransactionId   String?           // Private Token API transaction_id
   paymentHeader          String?           @db.Text
   encryptedDisputeReason String?
+  aiDecision             String?           // 'AI_VALID', 'AI_INVALID'
+  aiReasoning            String?           @db.Text
+  aiConfidence           Int?              // 0-100
+  merchantExplanation    String?           @db.Text
+  aiAnalyzedAt           DateTime?
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 

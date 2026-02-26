@@ -14,6 +14,7 @@ import authRoutes from './routes/authRoutes';
 import resourceRoutes from './routes/resourceRoutes';
 import gatewayRoutes from './routes/gatewayRoutes';
 import exploreRoutes from './routes/exploreRoutes';
+import disputeRoutes from './routes/disputeRoutes';
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -47,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/gateway', gatewayRoutes);
 app.use('/api/explore', exploreRoutes);  // Public routes for AI agent discovery
+app.use('/api/disputes', disputeRoutes); // AI dispute resolution
 
 // Health check
 app.get('/health', (req, res) => {

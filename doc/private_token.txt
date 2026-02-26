@@ -1,0 +1,416 @@
+API Documentation
+This document describes both the onchain smart contract interface and the offchain REST API for the Compliant Private Token Demo.
+
+Disclaimer
+
+This project is being made available for experimentation by participants of the Convergence 2026 Hackathon and is intended solely for demonstration and educational purposes. This project represents an example of using a Chainlink product or service and is provided to help you understand how to interact with Chainlink's systems and services so that you can integrate them into your own. This is provided "AS IS" and "AS AVAILABLE" without warranties of any kind, has not been audited, and may be missing key checks or error handling to make the usage of the product more clear. Do not use any code in this project in a production environment without completing your own audits and application of best practices. Neither Chainlink Labs, the Chainlink Foundation, nor Chainlink node operators are responsible for unintended outputs that are generated due to errors in code.
+
+Overview
+The system consists of two main components:
+
+Offchain API: Manages private balances, transfers, and withdrawal ticket generation
+Smart Contract: Handles onchain deposits, withdrawals, and policy enforcement
+Compliance-logic is enforced through Chainlink ACE (Automated Compliance Engine), which provides modular policy management for blockchain applications. Each token registered in the vault is associated with a policy engine that validates deposits, withdrawals, and private transfers against configurable rules (e.g., KYC/AML whitelists). Onchain operations call IPolicyEngine.run() to enforce policies, while private transfers are validated via the checkPrivateTransferAllowed() view function before execution. See the Chainlink ACE GitHub repository for implementation details.
+
+Offchain API
+Property	Value
+Base URL	https://convergence2026-token-api.cldev.cloud/
+Endpoint	Description
+/balances	Retrieve token balances for an account
+/transactions	List transaction history with pagination
+/private-transfer	Execute a private token transfer to another user
+/shielded-address	Generate a new privacy-preserving shielded address
+/withdraw	Request a withdrawal ticket to redeem tokens onchain
+Smart Contract
+Property	Value
+Address	0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13
+Network	Ethereum Sepolia (Chain ID: 11155111)
+Function	Description
+deposit(...)	Deposit tokens into the vault (requires prior ERC-20 approval)
+depositWithPermit(...)	Deposit using ERC-2612 permit (gasless approval)
+withdrawWithTicket(...)	Redeem a withdrawal ticket from the /withdraw API endpoint
+register(...)	Register a token with its Chainlink ACE policy engine
+checkDepositAllowed(...)	Simulate deposit policy check (view)
+checkWithdrawAllowed(...)	Simulate withdrawal policy check (view)
+checkPrivateTransferAllowed(...)	Simulate private transfer policy check (view)
+Key Concepts
+Shielded Addresses
+Shielded addresses provide recipient privacy for private transfers. Instead of sharing your real Ethereum address, you can generate a shielded address and give that to senders.
+
+Privacy: Without the server's secret key, it is computationally infeasible to link a shielded address to its owner
+Unlinkability: You can generate unlimited shielded addresses; they cannot be correlated with each other
+Standard format: 20 bytes, looks like a regular Ethereum address
+Automatic resolution: When someone sends to your shielded address, the server resolves it and credits your real account
+Withdrawal Tickets
+Withdrawing tokens from the private vault is a two-step process:
+
+Request a ticket: Call /withdraw to get a signed withdrawal ticket (your balance is immediately deducted)
+Redeem on-chain: Pass the ticket to the smart contract's withdrawWithTicket() function
+Tickets expire after 1 hour. If not redeemed, your balance is automatically refunded.
+
+Key Concepts
+Shielded Addresses
+Shielded addresses provide recipient privacy for private transfers. Instead of sharing your real Ethereum address, you can generate a shielded address and give that to senders.
+
+Privacy: Without the server's secret key, it is computationally infeasible to link a shielded address to its owner
+Unlinkability: You can generate unlimited shielded addresses; they cannot be correlated with each other
+Standard format: 20 bytes, looks like a regular Ethereum address
+Automatic resolution: When someone sends to your shielded address, the server resolves it and credits your real account
+Withdrawal Tickets
+Withdrawing tokens from the private vault is a two-step process:
+
+Request a ticket: Call /withdraw to get a signed withdrawal ticket (your balance is immediately deducted)
+Redeem on-chain: Pass the ticket to the smart contract's withdrawWithTicket() function
+Tickets expire after 1 hour. If not redeemed, your balance is automatically refunded.
+
+Offchain API
+Authentication
+All API endpoints require EIP-712 typed data signatures for authentication. Each request must include authentication fields that prove the caller controls the specified Ethereum address.
+
+AuthFields
+Every request includes these common authentication fields:
+
+Field	Type	Description
+account	String	The Ethereum address making the request (0x-prefixed, checksummed)
+timestamp	Number	Unix timestamp (seconds, milliseconds, or nanoseconds). Must be within 5 minutes.
+auth	String	EIP-712 signature of the request payload (0x-prefixed, 65 bytes)
+Timestamp Validation
+Timestamps are automatically normalized (seconds, milliseconds, or nanoseconds are all accepted)
+Requests expire after 5 minutes from the timestamp
+Timestamps up to 10 seconds in the future are tolerated
+For state-changing operations, timestamps of later requests must be after timestamp for earlier requests.
+EIP-712 Domain
+All signatures use the following EIP-712 domain:
+
+{
+    "name": "CompliantPrivateTokenDemo",
+    "version": "0.0.1",
+    "chainId": 11155111,
+    "verifyingContract": "0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13"
+}
+Signing Process
+Construct the EIP-712 typed data for your request (see each endpoint for the specific type)
+Sign with MetaMask or any EIP-712 compatible wallet: eth_signTypedData_v4
+Include the signature as the auth field in your request
+Endpoints
+GET Endpoints (Web UI)
+All endpoints support GET requests that return an interactive HTML page for generating and signing requests via MetaMask. Simply navigate to the endpoint URL in a browser.
+
+POST /balances
+Retrieve token balances for an account.
+
+EIP-712 Structure for Authentication:
+
+{
+    "PrimaryType": "Retrieve Balances",
+    "Message": {
+        "account": "address",
+        "timestamp": "uint256"
+    }
+}
+Request Body:
+
+{
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "timestamp": 1767225600,
+    "auth": "0x..."
+}
+Response:
+
+{
+    "balances": [
+        {
+            "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+            "amount": "1000000000000000000"
+        }
+    ]
+}
+POST /transactions
+List transaction history with pagination.
+
+EIP-712 Structure for Authentication:
+
+{
+    "PrimaryType": "List Transactions",
+    "Message": {
+        "account": "address",
+        "timestamp": "uint256",
+        "cursor": "string",
+        "limit": "uint256"
+    }
+}
+Request Body:
+
+Field	Type	Required	Description
+account	String	Yes	Account address
+timestamp	Number	Yes	Request timestamp
+auth	String	Yes	EIP-712 signature
+cursor	String	No	Pagination cursor (UUID from previous response)
+limit	Number	No	Maximum results to return
+Request Example:
+
+{
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "timestamp": 1767225600,
+    "auth": "0x...",
+    "limit": 10
+}
+Response:
+
+{
+    "transactions": [
+        {
+            "id": "01950000-0000-7000-0000-000000000001",
+            "type": "deposit",
+            "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+            "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+            "amount": "1000000000000000000",
+            "tx_hash": "0x..."
+        },
+        {
+            "id": "01950000-0000-7000-0000-000000000002",
+            "type": "transfer",
+            "sender": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+            "recipient": "0xB50757cE55B61A295120dE18293Cbb853E400F1d",
+            "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+            "amount": "500000000000000000",
+            "is_incoming": false,
+            "is_sender_hidden": false
+        }
+    ],
+    "has_more": true,
+    "next_cursor": "01950000-0000-7000-0000-000000000002"
+}
+Transaction Types:
+
+deposit: Onchain deposit into the vault
+withdrawal: Withdrawal request (see withdraw_status for state)
+transfer: Private offchain transfer
+Withdrawal Status Values:
+
+pending: Ticket issued, awaiting onchain redemption
+completed: Successfully withdrawn onchain
+refunded: Ticket expired and balance refunded
+POST /private-transfer
+Execute a private token transfer to another user.
+
+EIP-712 Structure for Authentication:
+
+{
+    "PrimaryType": "Private Token Transfer",
+    "Message": {
+        "sender": "address",
+        "recipient": "address",
+        "token": "address",
+        "amount": "uint256",
+        "flags": "string[]",
+        "timestamp": "uint256"
+    }
+}
+Request Body:
+
+Field	Type	Required	Description
+account	String	Yes	Sender's address
+recipient	String	Yes	Recipient's address (public or shielded)
+token	String	Yes	Token contract address
+amount	String	Yes	Amount in wei (as string)
+flags	String[]	No	Optional flags (e.g., ["hide-sender"])
+timestamp	Number	Yes	Request timestamp
+auth	String	Yes	EIP-712 signature
+Flags:
+
+hide-sender / hideSender / hide_sender: Hide sender address from recipient's view
+Request Example:
+
+{
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "recipient": "0xB50757cE55B61A295120dE18293Cbb853E400F1d",
+    "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+    "amount": "1000000000000000000",
+    "flags": [],
+    "timestamp": 1767225600,
+    "auth": "0x..."
+}
+Response:
+
+{
+    "transaction_id": "01950000-0000-7000-0000-000000000003"
+}
+Policy Enforcement: The transfer is validated against the onchain policy engine via checkPrivateTransferAllowed() before execution.
+
+POST /withdraw
+Request a withdrawal ticket to redeem tokens onchain. See Withdrawal Tickets for an overview.
+
+EIP-712 Structure for Authentication:
+
+{
+    "PrimaryType": "Withdraw Tokens",
+    "Message": {
+        "account": "address",
+        "token": "address",
+        "amount": "uint256",
+        "timestamp": "uint256"
+    }
+}
+Request Body:
+
+{
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+    "amount": "1000000000000000000",
+    "timestamp": 1767225600,
+    "auth": "0x..."
+}
+Response:
+
+{
+    "id": "01950000-0000-7000-0000-000000000004",
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+    "amount": "1000000000000000000",
+    "deadline": 1767229200,
+    "ticket": "0x..."
+}
+Important:
+
+The ticket value must be passed to the smart contract's withdrawWithTicket(token, amount, ticket) function to complete the withdrawal onchain
+The ticket has a 1-hour deadline (deadline field shows the Unix timestamp expiration)
+If not redeemed before the deadline, the balance is automatically refunded to the user's private balance
+The balance is immediately deducted when the ticket is issued; it is refunded if the ticket expires unused
+POST /shielded-address
+Generate a new privacy-preserving shielded address. See Shielded Addresses for an overview.
+
+EIP-712 Structure for Authentication:
+
+{
+    "PrimaryType": "Generate Shielded Address",
+    "Message": {
+        "account": "address",
+        "timestamp": "uint256"
+    }
+}
+Request Body:
+
+{
+    "account": "0x6346061C15fA564dC5BBb79539482E8d2682Fa85",
+    "timestamp": 1767225600,
+    "auth": "0x..."
+}
+Response:
+
+{
+    "address": "0xBBb514910646061C15fA564482E8d2682Fa8dC5A"
+}
+Shielded Addresses:
+
+20-byte addresses that look like regular Ethereum addresses
+Can be shared with senders without revealing your primary address
+Multiple shielded addresses can be generated per account
+Only the private offchain service knows the the derivation key needed to link a shielded address to its owner
+Error Responses
+All errors return a JSON object with the following structure:
+
+{
+    "error": "error_code",
+    "error_details": "Human-readable description",
+    "request_id": "unique-request-id"
+}
+Common Error Codes:
+
+Error	Description
+bad_request	Invalid JSON or missing required fields
+request_auth_failed	Signature verification failed
+request_auth_expired	Timestamp outside valid window
+insufficient_balance	Not enough tokens for the operation
+operation_denied_by_policy	Policy engine rejected the operation
+invalid_recipient	Unknown or invalid recipient address
+Onchain Smart Contract
+DemoCompliantPrivateTokenVault
+The vault contract manages onchain deposits and withdrawals, integrating with Chainlink ACE policy engines for verifying compliance-logic.
+
+Events
+event Deposit(address indexed user, address indexed token, uint256 amount);
+Emitted when a user deposits tokens. The private offchain service monitors this event to credit the user's private balance.
+
+event Withdraw(address indexed user, address indexed token, uint256 amount, bytes32 indexed withdrawTicketHash);
+Emitted when a withdrawal ticket is successfully redeemed. The withdrawTicketHash links to the offchain withdrawal record.
+
+event TokenRegistered(address indexed token, address indexed policyEngine, address indexed registrar);
+event TokenUpdated(address indexed token, address indexed policyEngine, address indexed registrar);
+event TokenDeleted(address indexed token, address indexed registrar);
+Emitted when token registrations change.
+
+Functions
+register
+Register a token and its policy engine. First-come, first-served registration.
+
+function register(address token, address policyEngine) external
+Only the original registrar can update or delete a registration
+Pass policyEngine = address(0) to delete a registration
+deposit
+Deposit tokens into the vault (requires prior ERC-20 approval).
+
+function deposit(address token, uint256 amount) external
+User must first call token.approve(vault, amount)
+User calls vault.deposit(token, amount)
+Policy engine validates the deposit
+Private offchain service credits the user's private balance
+depositWithPermit
+Deposit using ERC-2612 permit (gasless approval).
+
+function depositWithPermit(
+    address token,
+    uint256 amount,
+    uint256 deadline,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+) external
+Combines approval and deposit in a single transaction for tokens supporting ERC-2612.
+
+withdrawWithTicket
+Redeem a withdrawal ticket obtained from the /withdraw API endpoint.
+
+function withdrawWithTicket(address token, uint256 amount, bytes calldata ticket) external
+Parameters:
+
+token: The token address to withdraw
+amount: The exact amount specified when requesting the ticket
+ticket: The ticket value returned by the /withdraw API endpoint
+Ticket Format (89 bytes):
+
+Bytes	Field	Type	Description
+0-15	nonce	uint128	Random nonce for replay protection
+16-23	deadline	uint64	Unix timestamp expiration
+24-88	signature	bytes65	Private offchain service's EIP-712 signature
+Requirements:
+
+Caller must be the account that requested the ticket
+Current block timestamp must be ≤ deadline
+Ticket must not have been used before
+Policy engine must approve the withdrawal
+View Functions
+function checkDepositAllowed(address depositor, address token, uint256 amount) external view
+function checkWithdrawAllowed(address withdrawer, address token, uint256 amount) external view
+function checkPrivateTransferAllowed(address from, address to, address token, uint256 amount) external view
+Simulate policy checks without executing. Reverts if the operation would be denied.
+
+function sPolicyEngines(address token) external view returns (address)
+function sRegistrars(address token) external view returns (address)
+function I_WITHDRAW_TICKET_SIGNER() external view returns (address)
+Query registered policy engines and the trusted signer address.
+
+Withdrawal Flow Summary
+Request Ticket: Call POST /withdraw with signed request
+Receive Ticket: API deducts balance and returns ticket with deadline
+Onchain Redemption: Call vault.withdrawWithTicket(token, amount, ticket) before deadline
+Indexer Update: Offchain system detects Withdraw event and marks withdrawal complete
+Expiration Handling: If deadline passes without redemption, balance is automatically refunded
+Policy Integration
+All operations (deposits, withdrawals, private transfers) are validated against Chainlink ACE policy engines:
+
+Deposits: Checked onchain via IPolicyEngine.run()
+Withdrawals: Checked onchain via IPolicyEngine.run()
+Private Transfers: Checked offchain via checkPrivateTransferAllowed() view call
+Policy violations result in transaction reverts (onchain) or operation_denied_by_policy errors (offchain).
+

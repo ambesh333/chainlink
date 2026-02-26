@@ -5,7 +5,9 @@ import {
     createResource,
     updateResource,
     deleteResource,
-    getDashboardStats
+    getDashboardStats,
+    getEarnings,
+    claimResourceEarnings
 } from '../controllers/resourceController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -16,6 +18,12 @@ router.use(authMiddleware);
 
 // GET /api/resources/stats - Dashboard overview stats
 router.get('/stats', getDashboardStats);
+
+// GET /api/resources/earnings - Per-resource earnings breakdown
+router.get('/earnings', getEarnings);
+
+// POST /api/resources/claim/:resourceId - Claim pending earnings for a resource
+router.post('/claim/:resourceId', claimResourceEarnings);
 
 // GET /api/resources - List all resources for user
 router.get('/', listResources);

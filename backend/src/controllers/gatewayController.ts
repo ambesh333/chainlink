@@ -5,6 +5,8 @@ import {
     createEscrowOnChain,
     finalizeSettlementOnChain,
     getEscrowContractAddress,
+    getEscrowOnChain,
+    EscrowState,
     generateEscrowKey,
     getLockedAmount,
 } from '../clients/escrowClient';
@@ -304,41 +306,51 @@ export const settleTransaction = async (req: Request, res: Response) => {
         if (status === 'SETTLED') {
             // Facilitator finalizes on-chain: pays merchant
             let settleTxHash: string | null = null;
+            let onChainSuccess = false;
             if (escrowKey) {
                 try {
                     const result = await finalizeSettlementOnChain(escrowKey, true);
                     settleTxHash = result.txHash;
+                    onChainSuccess = true;
                     console.log(`[Gateway] finalizeSettlement (pay merchant) tx: ${settleTxHash}`);
                 } catch (err: any) {
-                    // Log and continue — DB will still update; on-chain tx may need manual retry
-                    console.error(`[Gateway] finalizeSettlement failed: ${err.message}`);
+                    // Check if the settlement listener already settled it on-chain
+                    try {
+                        const escrow = await getEscrowOnChain(escrowKey);
+                        if (escrow.state === EscrowState.Settled) {
+                            console.log(`[Gateway] Escrow already settled on-chain (likely by listener)`);
+                            onChainSuccess = true;
+                        }
+                    } catch { /* ignore */ }
+
+                    if (!onChainSuccess) {
+                        console.error(`[Gateway] finalizeSettlement failed: ${err.message}`);
+                    }
                 }
             }
 
-            const updatedTx = await prisma.transaction.update({
-                where: { id: transactionId },
-                data: { status: 'SETTLED' },
-            });
+            // Mark SETTLED if on-chain is settled (either by us or by the listener)
+            if (onChainSuccess) {
+                const updatedTx = await prisma.transaction.update({
+                    where: { id: transactionId },
+                    data: { status: 'SETTLED' },
+                });
 
-            return res.json({
-                success: true,
-                status: updatedTx.status,
-                settlementTx: settleTxHash,
-                message: 'Funds released to merchant on-chain.',
-            });
+                return res.json({
+                    success: true,
+                    status: updatedTx.status,
+                    settlementTx: settleTxHash,
+                    message: 'Funds released to merchant on-chain.',
+                });
+            } else {
+                return res.json({
+                    success: true,
+                    status: 'PENDING',
+                    message: 'Settlement recorded. On-chain finalization pending — merchant can claim via Earnings page.',
+                });
+            }
         } else {
-            // DISPUTED: facilitator finalizes on-chain: refunds agent
-            let refundTxHash: string | null = null;
-            if (escrowKey) {
-                try {
-                    const result = await finalizeSettlementOnChain(escrowKey, false);
-                    refundTxHash = result.txHash;
-                    console.log(`[Gateway] finalizeSettlement (refund agent) tx: ${refundTxHash}`);
-                } catch (err: any) {
-                    console.error(`[Gateway] finalizeSettlement (refund) failed: ${err.message}`);
-                }
-            }
-
+            // DISPUTED: record dispute reason, keep status as REFUND_REQUESTED
             const updatedTx = await prisma.transaction.update({
                 where: { id: transactionId },
                 data: {
@@ -350,8 +362,7 @@ export const settleTransaction = async (req: Request, res: Response) => {
             return res.json({
                 success: true,
                 status: updatedTx.status,
-                refundTx: refundTxHash,
-                message: 'Dispute recorded. Funds returned to agent on-chain.',
+                message: 'Dispute recorded. Awaiting AI resolution.',
             });
         }
     } catch (error) {
