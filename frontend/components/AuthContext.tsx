@@ -96,7 +96,7 @@ Sign in to Chainlink Agent
 
 URI: ${origin}
 Version: 1
-Chain ID: 1
+Chain ID: 11155111
 Nonce: ${nonce}
 Issued At: ${issuedAt}`;
 
