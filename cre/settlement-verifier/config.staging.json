@@ -1,6 +1,7 @@
 {
-  "escrowContractAddress": "0x4290721c3a000A23b77B12E971A51ae3a2a4CB06",
-  "disputeConsumerAddress": "0x0000000000000000000000000000000000000000",
+  "escrowContractAddress": "0x182aB561564Ef0f16571Aba90c60993DE5aEcA04",
+  "disputeConsumerAddress": "0x9Ca2f89Af2a96B49a755d8047449f2aA3946b1D9",
   "backendUrl": "http://localhost:3001/api",
-  "chainName": "ethereum-testnet-sepolia"
+  "chainName": "ethereum-testnet-sepolia",
+  "gasLimit": "500000"
 }

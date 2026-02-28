@@ -348,9 +348,7 @@ export default function DisputesPage() {
                                         <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
                                             <div className="text-xs text-gray-500 mb-2">Agent&apos;s Dispute Reason:</div>
                                             <p className="text-sm text-gray-300">
-                                                {(() => {
-                                                    try { return atob(dispute.encryptedReason); } catch { return dispute.encryptedReason; }
-                                                })()}
+                                                {dispute.encryptedReason}
                                             </p>
                                         </div>
                                     )}

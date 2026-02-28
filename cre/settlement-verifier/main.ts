@@ -15,9 +15,10 @@ import {
   ConfidentialHTTPClient,
   handler,
   Runner,
-  prepareReportRequest,
   type Runtime,
   type EVMLog,
+  bytesToHex,
+  hexToBase64,
 } from "@chainlink/cre-sdk";
 import { encodeAbiParameters, type Hex } from "viem";
 
@@ -27,11 +28,21 @@ type Config = {
   disputeConsumerAddress: string;
   backendUrl: string;
   chainName: string;
+  gasLimit: string;
 };
 
 // SettlementRequested(bytes32 indexed key, address indexed agent)
 const SETTLEMENT_REQUESTED_EVENT_SIG =
   "0x96186b8375a7f1e5d882fb44d498e7e41e518e3ae009fd917965bffc28b3b65e";
+
+function decodeTopic(topic: unknown): Hex {
+  if (!topic) return "0x";
+  if (typeof topic === "string") return topic as Hex;
+  if (topic instanceof Uint8Array) {
+    return ("0x" + Buffer.from(topic).toString("hex")) as Hex;
+  }
+  throw new Error("Invalid topic format");
+}
 
 // ─── Handler ───────────────────────────────────────────────────────────────
 const onSettlementRequested = (
@@ -39,10 +50,13 @@ const onSettlementRequested = (
   triggerOutput: EVMLog
 ): string => {
   const config = runtime.config;
-  const topics = triggerOutput.topics ?? [];
-  const escrowKey = topics[1] ?? "0x";
 
-  runtime.log(`SettlementRequested: key=${escrowKey}`);
+  const escrowKey = decodeTopic(triggerOutput.topics?.[1]);
+  const txHash = decodeTopic(triggerOutput.txHash);
+
+  runtime.log(`SettlementRequested detected`);
+  runtime.log(`Escrow Key: ${escrowKey}`);
+  runtime.log(`Original TX: ${txHash}`);
 
   // ── 1. Verify resource delivery via backend ──────────────────────────
   const confidentialHttp = new ConfidentialHTTPClient();
@@ -76,26 +90,53 @@ const onSettlementRequested = (
   }
 
   // ── 2. Build report: finalize settlement paying merchant ─────────────
-  const reportPayload = encodeAbiParameters(
+  const reportData = encodeAbiParameters(
     [{ type: "bytes32" }, { type: "bool" }],
-    [escrowKey as unknown as Hex, true] // payMerchant = true
+    [escrowKey, true] // payMerchant = true
   );
 
-  const reportRequest = prepareReportRequest(reportPayload);
-  const report = runtime.report(reportRequest).result();
+  runtime.log(
+    `Generating signed report → escrowKey=${escrowKey}, payMerchant=true`
+  );
+
+  const reportResponse = runtime
+    .report({
+      encodedPayload: hexToBase64(reportData),
+      encoderName: "evm",
+      signingAlgo: "ecdsa",
+      hashingAlgo: "keccak256",
+    })
+    .result();
 
   // ── 3. Write report to DisputeConsumer ───────────────────────────────
   const evmClient = new EVMClient(
     EVMClient.SUPPORTED_CHAIN_SELECTORS["ethereum-testnet-sepolia"]
   );
 
-  evmClient.writeReport(runtime, {
-    receiver: config.disputeConsumerAddress,
-    report,
-  }).result();
+  runtime.log(`Submitting report to DisputeConsumer...`);
 
-  runtime.log(`Settlement auto-finalized: key=${escrowKey}, payMerchant=true`);
-  return `Settled: ${escrowKey} → payMerchant=true`;
+  const writeReportResult = evmClient
+    .writeReport(runtime, {
+      receiver: config.disputeConsumerAddress,
+      report: reportResponse,
+      gasConfig: {
+        gasLimit: config.gasLimit,
+      },
+    })
+    .result();
+
+  runtime.log("Waiting for write report response...");
+
+  const finalTxHash = bytesToHex(
+    writeReportResult.txHash || new Uint8Array(32)
+  );
+
+  runtime.log(`Write report transaction succeeded: ${finalTxHash}`);
+  runtime.log(
+    `View transaction at https://sepolia.etherscan.io/tx/${finalTxHash}`
+  );
+
+  return `Settled: ${escrowKey} → payMerchant=true | txHash=${finalTxHash}`;
 };
 
 // ─── Workflow Init ─────────────────────────────────────────────────────────

@@ -61,8 +61,8 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Chainlink Agent Backend running on port ${PORT}`);
 
-    // Start on-chain settlement event listener
-    startSettlementListener();
+    // Settlement finalization is now handled by the CRE settlement-verifier workflow.
+    // startSettlementListener();
 });
 
 // Handle shutdown

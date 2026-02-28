@@ -48,13 +48,7 @@ router.get('/dispute-context/:escrowKey', async (req, res) => {
             return res.status(404).json({ error: 'No transaction found for this escrow key' });
         }
 
-        // Decode dispute reason
-        let disputeReason = transaction.encryptedDisputeReason || 'No reason provided';
-        try {
-            disputeReason = Buffer.from(disputeReason, 'base64').toString('utf-8');
-        } catch {
-            // Keep as-is
-        }
+        const disputeReason = transaction.encryptedDisputeReason || 'No reason provided';
 
         return res.json({
             escrowKey,
@@ -114,13 +108,7 @@ router.get('/analyze-dispute/:escrowKey', async (req, res) => {
             return res.status(404).json({ error: 'No transaction found for this escrow key' });
         }
 
-        // Decode dispute reason
-        let disputeReason = transaction.encryptedDisputeReason || 'No reason provided';
-        try {
-            disputeReason = Buffer.from(disputeReason, 'base64').toString('utf-8');
-        } catch {
-            // Keep as-is
-        }
+        const disputeReason = transaction.encryptedDisputeReason || 'No reason provided';
 
         const resource = transaction.resource;
         const analysisInput: AnalysisInput = {

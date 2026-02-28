@@ -273,7 +273,8 @@ export const accessResource = async (req: Request, res: Response) => {
  * POST /api/gateway/settle
  *
  * Agent notifies that they've called requestSettlement(key) on-chain.
- * The backend (facilitator) then calls finalizeSettlement(key, true) to pay the merchant.
+ * On-chain finalization is handled by the CRE settlement-verifier workflow.
+ * This endpoint only updates the DB if the CRE has already settled it.
  *
  * Body: { transactionId, status: "SETTLED" | "DISPUTED", reason? }
  */
@@ -304,33 +305,20 @@ export const settleTransaction = async (req: Request, res: Response) => {
         const escrowKey = transaction.paymentTransactionId;
 
         if (status === 'SETTLED') {
-            // Facilitator finalizes on-chain: pays merchant
-            let settleTxHash: string | null = null;
-            let onChainSuccess = false;
+            // On-chain finalization is now handled by the CRE settlement-verifier workflow.
+            // Here we only check if CRE has already settled it on-chain, and sync DB accordingly.
+            let onChainSettled = false;
             if (escrowKey) {
                 try {
-                    const result = await finalizeSettlementOnChain(escrowKey, true);
-                    settleTxHash = result.txHash;
-                    onChainSuccess = true;
-                    console.log(`[Gateway] finalizeSettlement (pay merchant) tx: ${settleTxHash}`);
-                } catch (err: any) {
-                    // Check if the settlement listener already settled it on-chain
-                    try {
-                        const escrow = await getEscrowOnChain(escrowKey);
-                        if (escrow.state === EscrowState.Settled) {
-                            console.log(`[Gateway] Escrow already settled on-chain (likely by listener)`);
-                            onChainSuccess = true;
-                        }
-                    } catch { /* ignore */ }
-
-                    if (!onChainSuccess) {
-                        console.error(`[Gateway] finalizeSettlement failed: ${err.message}`);
+                    const escrow = await getEscrowOnChain(escrowKey);
+                    if (escrow.state === EscrowState.Settled) {
+                        console.log(`[Gateway] Escrow already settled on-chain by CRE`);
+                        onChainSettled = true;
                     }
-                }
+                } catch { /* ignore */ }
             }
 
-            // Mark SETTLED if on-chain is settled (either by us or by the listener)
-            if (onChainSuccess) {
+            if (onChainSettled) {
                 const updatedTx = await prisma.transaction.update({
                     where: { id: transactionId },
                     data: { status: 'SETTLED' },
@@ -339,14 +327,13 @@ export const settleTransaction = async (req: Request, res: Response) => {
                 return res.json({
                     success: true,
                     status: updatedTx.status,
-                    settlementTx: settleTxHash,
-                    message: 'Funds released to merchant on-chain.',
+                    message: 'Funds released to merchant on-chain via CRE.',
                 });
             } else {
                 return res.json({
                     success: true,
                     status: 'PENDING',
-                    message: 'Settlement recorded. On-chain finalization pending — merchant can claim via Earnings page.',
+                    message: 'Settlement requested. CRE workflow will verify delivery and finalize on-chain.',
                 });
             }
         } else {

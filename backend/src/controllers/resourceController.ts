@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../context';
 import { calculateMerchantScore, getScoreLabel } from '../utils/scoring';
-import { getEscrowOnChain, finalizeSettlementOnChain, EscrowState } from '../clients/escrowClient';
+import { getEscrowOnChain, EscrowState } from '../clients/escrowClient';
 
 interface CreateResourceBody {
     title: string;
@@ -364,29 +364,20 @@ export const claimResourceEarnings = async (req: Request, res: Response) => {
         for (const tx of pendingTxns) {
             const escrowKey = tx.paymentTransactionId!;
             try {
-                // Check on-chain state
+                // Check on-chain state — finalization is handled by CRE settlement-verifier
                 const escrow = await getEscrowOnChain(escrowKey);
 
-                if (escrow.state === EscrowState.SettlementRequested || escrow.state === EscrowState.Funded) {
-                    // Finalize: pay merchant
-                    const { txHash } = await finalizeSettlementOnChain(escrowKey, true);
-                    console.log(`[Claim] finalizeSettlement for key=${escrowKey.slice(0, 18)}... tx=${txHash}`);
-
-                    await prisma.transaction.update({
-                        where: { id: tx.id },
-                        data: { status: 'SETTLED' },
-                    });
-
-                    claimed++;
-                    claimedAmount += tx.amount;
-                } else if (escrow.state === EscrowState.Settled) {
-                    // Already settled on-chain, just update DB
+                if (escrow.state === EscrowState.Settled) {
+                    // CRE already settled on-chain, sync DB
                     await prisma.transaction.update({
                         where: { id: tx.id },
                         data: { status: 'SETTLED' },
                     });
                     claimed++;
                     claimedAmount += tx.amount;
+                } else if (escrow.state === EscrowState.SettlementRequested || escrow.state === EscrowState.Funded) {
+                    // CRE hasn't finalized yet — skip, don't finalize directly
+                    errors.push(`Escrow ${escrowKey.slice(0, 10)}... awaiting CRE settlement`);
                 } else {
                     errors.push(`Escrow ${escrowKey.slice(0, 10)}... in state ${escrow.state} — not claimable`);
                 }

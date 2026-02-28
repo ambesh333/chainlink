@@ -38,15 +38,7 @@ export const aiAnalyzeDispute = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Transaction is not in dispute status' });
         }
 
-        // Decrypt dispute reason (try base64 decode, fallback to raw)
-        let disputeReason = transaction.encryptedDisputeReason || '';
-        if (disputeReason) {
-            try {
-                disputeReason = Buffer.from(disputeReason, 'base64').toString('utf-8');
-            } catch {
-                // Keep as-is
-            }
-        }
+        const disputeReason = transaction.encryptedDisputeReason || '';
 
         const resource = transaction.resource;
         const analysisInput: AnalysisInput = {
@@ -129,12 +121,7 @@ export const submitMerchantExplanation = async (req: Request, res: Response) => 
         });
 
         // Re-run AI analysis with merchant explanation
-        let disputeReason = transaction.encryptedDisputeReason || '';
-        if (disputeReason) {
-            try {
-                disputeReason = Buffer.from(disputeReason, 'base64').toString('utf-8');
-            } catch { }
-        }
+        const disputeReason = transaction.encryptedDisputeReason || '';
 
         const resource = transaction.resource;
         const analysisInput: AnalysisInput = {
