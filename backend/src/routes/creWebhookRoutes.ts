@@ -252,4 +252,70 @@ router.get('/resolution/:escrowKey', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/cre/expired-escrows
+ *
+ * Returns a list of escrow keys that have expired on-chain but are still
+ * in an active state (Funded or SettlementRequested). Used by the CRE
+ * expiry-watchdog workflow to auto-refund agents.
+ */
+router.get('/expired-escrows', async (req, res) => {
+    try {
+        // Find all PENDING transactions with escrow keys
+        const pendingTxns = await prisma.transaction.findMany({
+            where: {
+                status: 'PENDING',
+                paymentTransactionId: { not: null },
+            },
+            select: {
+                id: true,
+                paymentTransactionId: true,
+                agentId: true,
+            },
+            orderBy: { createdAt: 'asc' },
+            take: 20, // Limit to avoid overloading
+        });
+
+        if (pendingTxns.length === 0) {
+            return res.json({ expired: [], count: 0 });
+        }
+
+        const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+        const expired: { escrowKey: string; transactionId: string; agentId: string }[] = [];
+
+        for (const tx of pendingTxns) {
+            const escrowKey = tx.paymentTransactionId!;
+            try {
+                const escrow = await getEscrowOnChain(escrowKey);
+
+                // Only consider active states that can expire
+                const isActive =
+                    escrow.state === EscrowState.Funded ||
+                    escrow.state === EscrowState.SettlementRequested;
+
+                if (isActive && escrow.expiry <= nowSeconds) {
+                    expired.push({
+                        escrowKey,
+                        transactionId: tx.id,
+                        agentId: tx.agentId,
+                    });
+                }
+            } catch {
+                // Skip escrows that can't be read on-chain
+            }
+        }
+
+        console.log(`[CRE] Expired escrows check: ${expired.length}/${pendingTxns.length} expired`);
+
+        return res.json({
+            expired,
+            count: expired.length,
+            checkedAt: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('[CRE] Expired escrows error:', error);
+        return res.status(500).json({ error: 'Failed to check expired escrows' });
+    }
+});
+
 export default router;
