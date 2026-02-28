@@ -280,7 +280,7 @@ export const accessResource = async (req: Request, res: Response) => {
  */
 export const settleTransaction = async (req: Request, res: Response) => {
     try {
-        const { transactionId, status, reason } = req.body;
+        const { transactionId, status, reason, settlementTxHash } = req.body;
 
         if (!transactionId || !['SETTLED', 'DISPUTED'].includes(status)) {
             return res.status(400).json({
@@ -298,7 +298,7 @@ export const settleTransaction = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Transaction not found' });
         }
 
-        if (transaction.status !== 'PENDING') {
+        if (transaction.status !== 'PENDING' && transaction.status !== 'SETTLEMENT_REQUESTED') {
             return res.status(400).json({ error: `Transaction already finalized: ${transaction.status}` });
         }
 
@@ -321,7 +321,10 @@ export const settleTransaction = async (req: Request, res: Response) => {
             if (onChainSettled) {
                 const updatedTx = await prisma.transaction.update({
                     where: { id: transactionId },
-                    data: { status: 'SETTLED' },
+                    data: {
+                        status: 'SETTLED',
+                        ...(settlementTxHash ? { settlementTxHash } : {}),
+                    },
                 });
 
                 return res.json({
@@ -330,9 +333,17 @@ export const settleTransaction = async (req: Request, res: Response) => {
                     message: 'Funds released to merchant on-chain via CRE.',
                 });
             } else {
+                const updatedTx = await prisma.transaction.update({
+                    where: { id: transactionId },
+                    data: {
+                        status: 'SETTLEMENT_REQUESTED',
+                        ...(settlementTxHash ? { settlementTxHash } : {}),
+                    },
+                });
+
                 return res.json({
                     success: true,
-                    status: 'PENDING',
+                    status: updatedTx.status,
                     message: 'Settlement requested. CRE workflow will verify delivery and finalize on-chain.',
                 });
             }

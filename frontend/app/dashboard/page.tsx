@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Package, Globe, TrendingUp, Zap, Shield, ArrowRight, Terminal, Loader2, Wallet, CheckCircle, ArrowDownToLine, Image, Video, ExternalLink } from 'lucide-react';
+import { Package, Globe, TrendingUp, Zap, Shield, ArrowRight, Terminal, Loader2, Wallet, CheckCircle, Clock, Image, Video, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { getApiUrl } from '@/lib/config';
 
@@ -34,6 +34,8 @@ interface ResourceEarning {
     isActive: boolean;
     pendingCount: number;
     pendingAmount: number;
+    settlementRequestedCount: number;
+    settlementRequestedAmount: number;
     settledCount: number;
     settledAmount: number;
     totalTransactions: number;
@@ -58,8 +60,8 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [earnings, setEarnings] = useState<ResourceEarning[]>([]);
     const [totalPending, setTotalPending] = useState(0);
+    const [totalSettlementRequested, setTotalSettlementRequested] = useState(0);
     const [totalSettled, setTotalSettled] = useState(0);
-    const [claimingIds, setClaimingIds] = useState<Set<string>>(new Set());
 
     const getHeaders = () => {
         const token = getToken();
@@ -80,6 +82,7 @@ export default function DashboardPage() {
                 const data = await res.json();
                 setEarnings(data.earnings);
                 setTotalPending(data.totalPending);
+                setTotalSettlementRequested(data.totalSettlementRequested);
                 setTotalSettled(data.totalSettled);
             }
         } catch (error) {
@@ -112,29 +115,6 @@ export default function DashboardPage() {
     useEffect(() => {
         fetchEarnings();
     }, [getToken]);
-
-    const handleClaim = async (resourceId: string) => {
-        setClaimingIds(prev => new Set(prev).add(resourceId));
-        try {
-            const API_URL = getApiUrl();
-            const res = await fetch(`${API_URL}/resources/claim/${resourceId}`, {
-                method: 'POST',
-                headers: getHeaders(),
-                credentials: 'include',
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                alert(data.message);
-                await fetchEarnings();
-            } else {
-                alert(`Claim failed: ${data.error}`);
-            }
-        } catch (error: any) {
-            alert(`Claim failed: ${error.message}`);
-        } finally {
-            setClaimingIds(prev => { const s = new Set(prev); s.delete(resourceId); return s; });
-        }
-    };
 
     const getTypeIcon = (type: string) => {
         switch (type) {
@@ -230,15 +210,15 @@ export default function DashboardPage() {
                 </div>
                 <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Unclaimed</h3>
-                        <Wallet size={14} className="text-yellow-400" />
+                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Awaiting Settlement</h3>
+                        <Clock size={14} className="text-[#375BD2]" />
                     </div>
-                    <span className="text-3xl font-mono font-bold text-yellow-400">{totalPending.toFixed(5)} <span className="text-lg text-gray-500">ETH</span></span>
-                    <p className="text-xs text-gray-500 mt-2">Pending settlement from escrow</p>
+                    <span className="text-3xl font-mono font-bold text-[#375BD2]">{(totalPending + totalSettlementRequested).toFixed(5)} <span className="text-lg text-gray-500">ETH</span></span>
+                    <p className="text-xs text-gray-500 mt-2">Pending + awaiting CRE workflow</p>
                 </div>
                 <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Claimed</h3>
+                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Settled</h3>
                         <CheckCircle size={14} className="text-green-400" />
                     </div>
                     <span className="text-3xl font-mono font-bold text-green-400">{totalSettled.toFixed(5)} <span className="text-lg text-gray-500">ETH</span></span>
@@ -292,7 +272,7 @@ export default function DashboardPage() {
                     ) : (
                         recentTransactions.map((tx) => (
                             <div key={tx.id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors">
-                                <div className={`w-2 h-2 rounded-full ${tx.status === 'SETTLED' ? 'bg-green-400' : tx.status === 'REFUND_REQUESTED' ? 'bg-red-400' : tx.status === 'REFUNDED' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+                                <div className={`w-2 h-2 rounded-full ${tx.status === 'SETTLED' ? 'bg-green-400' : tx.status === 'SETTLEMENT_REQUESTED' ? 'bg-[#375BD2]' : tx.status === 'REFUND_REQUESTED' ? 'bg-red-400' : tx.status === 'REFUNDED' ? 'bg-red-400' : 'bg-yellow-400'}`} />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-white text-sm font-medium truncate">{tx.title}</p>
                                     <p className="text-gray-500 text-xs">{timeAgo(tx.date)}</p>
@@ -302,10 +282,11 @@ export default function DashboardPage() {
                                     <span className="text-white text-sm font-mono">{tx.price} ETH</span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                                         tx.status === 'SETTLED' ? 'bg-green-500/10 text-green-400' :
+                                        tx.status === 'SETTLEMENT_REQUESTED' ? 'bg-[#375BD2]/10 text-[#375BD2]' :
                                         tx.status === 'REFUND_REQUESTED' ? 'bg-red-500/10 text-red-400' :
                                         tx.status === 'REFUNDED' ? 'bg-red-500/10 text-red-400' :
                                         'bg-yellow-500/10 text-yellow-400'
-                                    }`}>{tx.status === 'REFUND_REQUESTED' ? 'DISPUTED' : tx.status}</span>
+                                    }`}>{tx.status === 'REFUND_REQUESTED' ? 'DISPUTED' : tx.status === 'SETTLEMENT_REQUESTED' ? 'AWAITING CRE' : tx.status}</span>
                                 </div>
                             </div>
                         ))
@@ -322,13 +303,13 @@ export default function DashboardPage() {
                     </h3>
                 </div>
                 {/* Table Header */}
-                <div className="grid grid-cols-[1fr_100px_140px_140px_100px_140px] gap-4 px-6 py-4 border-b border-white/5 text-xs text-gray-500 uppercase tracking-wider">
+                <div className="grid grid-cols-[1fr_100px_130px_130px_130px_120px] gap-4 px-6 py-4 border-b border-white/5 text-xs text-gray-500 uppercase tracking-wider">
                     <div>Resource</div>
                     <div>Price</div>
-                    <div>Unclaimed</div>
-                    <div>Claimed</div>
-                    <div>Txns</div>
-                    <div className="text-right">Action</div>
+                    <div>Pending</div>
+                    <div>Awaiting CRE</div>
+                    <div>Settled</div>
+                    <div className="text-right">Status</div>
                 </div>
 
                 {/* Table Body */}
@@ -339,13 +320,14 @@ export default function DashboardPage() {
                     </div>
                 ) : (
                     earnings.map((item) => {
-                        const isClaiming = claimingIds.has(item.resourceId);
-                        const hasUnclaimed = item.pendingCount > 0;
+                        const hasAwaitingCRE = item.settlementRequestedCount > 0;
+                        const hasPending = item.pendingCount > 0;
+                        const allSettled = !hasPending && !hasAwaitingCRE && item.settledCount > 0;
 
                         return (
                             <div
                                 key={item.resourceId}
-                                className="grid grid-cols-[1fr_100px_140px_140px_100px_140px] gap-4 px-6 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors items-center"
+                                className="grid grid-cols-[1fr_100px_130px_130px_130px_120px] gap-4 px-6 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors items-center"
                             >
                                 {/* Resource */}
                                 <div className="flex items-center gap-3 min-w-0">
@@ -364,15 +346,23 @@ export default function DashboardPage() {
                                     <span className="text-gray-600 text-xs ml-1">ETH</span>
                                 </div>
 
-                                {/* Unclaimed */}
+                                {/* Pending */}
                                 <div>
-                                    <div className={`font-mono text-sm font-medium ${hasUnclaimed ? 'text-yellow-400' : 'text-gray-600'}`}>
+                                    <div className={`font-mono text-sm font-medium ${hasPending ? 'text-yellow-400' : 'text-gray-600'}`}>
                                         {item.pendingAmount.toFixed(5)} ETH
                                     </div>
                                     <div className="text-xs text-gray-600">{item.pendingCount} txn{item.pendingCount !== 1 ? 's' : ''}</div>
                                 </div>
 
-                                {/* Claimed */}
+                                {/* Awaiting CRE */}
+                                <div>
+                                    <div className={`font-mono text-sm font-medium ${hasAwaitingCRE ? 'text-[#375BD2]' : 'text-gray-600'}`}>
+                                        {item.settlementRequestedAmount.toFixed(5)} ETH
+                                    </div>
+                                    <div className="text-xs text-gray-600">{item.settlementRequestedCount} txn{item.settlementRequestedCount !== 1 ? 's' : ''}</div>
+                                </div>
+
+                                {/* Settled */}
                                 <div>
                                     <div className="font-mono text-sm text-green-400">
                                         {item.settledAmount.toFixed(5)} ETH
@@ -380,31 +370,25 @@ export default function DashboardPage() {
                                     <div className="text-xs text-gray-600">{item.settledCount} txn{item.settledCount !== 1 ? 's' : ''}</div>
                                 </div>
 
-                                {/* Total Txns */}
-                                <div className="text-sm text-gray-400 font-mono">
-                                    {item.totalTransactions}
-                                </div>
-
-                                {/* Action */}
+                                {/* Status */}
                                 <div className="text-right">
-                                    {hasUnclaimed ? (
-                                        <button
-                                            onClick={() => handleClaim(item.resourceId)}
-                                            disabled={isClaiming}
-                                            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#375BD2]/10 hover:bg-[#375BD2]/20 text-[#375BD2] border border-[#375BD2]/20 hover:border-[#375BD2]/40 transition-all flex items-center gap-2 ml-auto disabled:opacity-50"
-                                        >
-                                            {isClaiming ? (
-                                                <Loader2 size={14} className="animate-spin" />
-                                            ) : (
-                                                <ArrowDownToLine size={14} />
-                                            )}
-                                            Claim
-                                        </button>
-                                    ) : (
+                                    {hasAwaitingCRE ? (
+                                        <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#375BD2]/10 text-[#375BD2] border border-[#375BD2]/20">
+                                            <Loader2 size={12} className="animate-spin" />
+                                            Awaiting CRE
+                                        </span>
+                                    ) : hasPending ? (
+                                        <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                                            <Clock size={12} />
+                                            Pending
+                                        </span>
+                                    ) : allSettled ? (
                                         <span className="inline-flex items-center gap-1.5 text-xs text-green-500/60">
                                             <CheckCircle size={12} />
-                                            Claimed
+                                            Settled
                                         </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-600">—</span>
                                     )}
                                 </div>
                             </div>

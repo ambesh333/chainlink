@@ -22,6 +22,7 @@ enum ResourceType {
 
 enum TransactionStatus {
   PENDING
+  SETTLEMENT_REQUESTED
   SETTLED
   REFUND_REQUESTED
   REFUNDED
@@ -91,6 +92,7 @@ model Transaction {
   expiryAt               DateTime
   paymentTransactionId   String?           // Private Token API transaction_id
   paymentHeader          String?           @db.Text
+  settlementTxHash       String?
   encryptedDisputeReason String?
   aiDecision             String?           // 'AI_VALID', 'AI_INVALID'
   aiReasoning            String?           @db.Text

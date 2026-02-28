@@ -152,6 +152,57 @@ router.get('/analyze-dispute/:escrowKey', async (req, res) => {
 });
 
 /**
+ * POST /api/cre/settlement-complete
+ *
+ * Called by the CRE settlement-verifier workflow after successfully finalizing
+ * settlement on-chain. Updates the DB from SETTLEMENT_REQUESTED → SETTLED.
+ */
+router.post('/settlement-complete', async (req, res) => {
+    try {
+        const { escrowKey, txHash } = req.body;
+
+        if (!escrowKey) {
+            return res.status(400).json({ error: 'escrowKey is required' });
+        }
+
+        const transaction = await prisma.transaction.findFirst({
+            where: { paymentTransactionId: escrowKey },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'No transaction found for this escrow key' });
+        }
+
+        if (transaction.status !== 'SETTLEMENT_REQUESTED' && transaction.status !== 'PENDING') {
+            return res.json({
+                success: true,
+                message: `Transaction already in state: ${transaction.status}`,
+            });
+        }
+
+        const updated = await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+                status: 'SETTLED',
+                ...(txHash ? { settlementTxHash: txHash } : {}),
+            },
+        });
+
+        console.log(`[CRE] Settlement complete for escrow=${escrowKey}, txHash=${txHash || 'n/a'}`);
+
+        return res.json({
+            success: true,
+            transactionId: updated.id,
+            status: updated.status,
+        });
+    } catch (error) {
+        console.error('[CRE] Settlement complete error:', error);
+        return res.status(500).json({ error: 'Failed to update settlement status' });
+    }
+});
+
+/**
  * GET /api/cre/verify-delivery/:escrowKey
  *
  * Verifies whether a resource was delivered for a given escrow.
@@ -179,7 +230,7 @@ router.get('/verify-delivery/:escrowKey', async (req, res) => {
 
         // A resource is considered delivered if the agent accessed it (has payment header)
         const hasPaymentHeader = !!transaction.paymentHeader;
-        const isPending = transaction.status === 'PENDING';
+        const isPending = transaction.status === 'PENDING' || transaction.status === 'SETTLEMENT_REQUESTED';
 
         // Optional: verify on-chain state
         let onChainVerified = false;

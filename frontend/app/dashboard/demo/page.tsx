@@ -456,6 +456,8 @@ export default function DemoPage() {
         addLine('', 'normal');
         addLine(status === 'SETTLED' ? 'Confirming receipt...' : 'Submitting dispute...', 'info');
 
+        let settlementTxHash: string | undefined;
+
         try {
             // Call raiseDispute() on-chain before notifying backend
             if (status === 'DISPUTED' && walletClient && paymentState) {
@@ -513,13 +515,20 @@ export default function DemoPage() {
                 addLine('✓ Settlement requested on-chain', 'success');
                 addLine('', 'normal');
                 addLine('Notifying backend...', 'info');
+
+                settlementTxHash = settleTxHash;
             }
 
             // POST to backend (fallback notification — event listener is primary trigger)
             const res = await fetch(`${getApiUrl()}/gateway/settle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transactionId: txId, status, reason }),
+                body: JSON.stringify({
+                    transactionId: txId,
+                    status,
+                    reason,
+                    ...(settlementTxHash ? { settlementTxHash } : {}),
+                }),
             });
             const data = await res.json();
             if (res.ok) {

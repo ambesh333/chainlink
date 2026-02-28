@@ -136,6 +136,29 @@ const onSettlementRequested = (
     `View transaction at https://sepolia.etherscan.io/tx/${finalTxHash}`
   );
 
+  // ── 4. Notify backend so DB is updated immediately ────────────────
+  try {
+    const notifyPayload = JSON.stringify({
+      escrowKey,
+      txHash: finalTxHash,
+    });
+
+    confidentialHttp.sendRequest(runtime, {
+      request: {
+        url: `${config.backendUrl}/cre/settlement-complete`,
+        method: "POST",
+        multiHeaders: {
+          "Content-Type": { values: ["application/json"] },
+        },
+        body: new TextEncoder().encode(notifyPayload),
+      },
+    }).result();
+
+    runtime.log(`Backend notified: settlement-complete for ${escrowKey}`);
+  } catch {
+    runtime.log(`Warning: failed to notify backend for ${escrowKey}`);
+  }
+
   return `Settled: ${escrowKey} → payMerchant=true | txHash=${finalTxHash}`;
 };
 

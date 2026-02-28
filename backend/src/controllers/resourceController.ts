@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../context';
 import { calculateMerchantScore, getScoreLabel } from '../utils/scoring';
-import { getEscrowOnChain, EscrowState } from '../clients/escrowClient';
 
 interface CreateResourceBody {
     title: string;
@@ -300,8 +299,10 @@ export const getEarnings = async (req: Request, res: Response) => {
 
         const earnings = resources.map(r => {
             const pending = r.transactions.filter(t => t.status === 'PENDING');
+            const settlementRequested = r.transactions.filter(t => t.status === 'SETTLEMENT_REQUESTED');
             const settled = r.transactions.filter(t => t.status === 'SETTLED');
             const pendingAmount = pending.reduce((s, t) => s + t.amount, 0);
+            const settlementRequestedAmount = settlementRequested.reduce((s, t) => s + t.amount, 0);
             const settledAmount = settled.reduce((s, t) => s + t.amount, 0);
 
             return {
@@ -312,6 +313,8 @@ export const getEarnings = async (req: Request, res: Response) => {
                 isActive: r.isActive,
                 pendingCount: pending.length,
                 pendingAmount,
+                settlementRequestedCount: settlementRequested.length,
+                settlementRequestedAmount,
                 settledCount: settled.length,
                 settledAmount,
                 totalTransactions: r.transactions.length,
@@ -319,83 +322,13 @@ export const getEarnings = async (req: Request, res: Response) => {
         });
 
         const totalPending = earnings.reduce((s, e) => s + e.pendingAmount, 0);
+        const totalSettlementRequested = earnings.reduce((s, e) => s + e.settlementRequestedAmount, 0);
         const totalSettled = earnings.reduce((s, e) => s + e.settledAmount, 0);
 
-        return res.json({ earnings, totalPending, totalSettled });
+        return res.json({ earnings, totalPending, totalSettlementRequested, totalSettled });
     } catch (error) {
         console.error('Earnings error:', error);
         return res.status(500).json({ error: 'Failed to fetch earnings' });
     }
 };
 
-/**
- * POST /api/resources/claim/:resourceId
- * Finalize settlement for all pending transactions of a resource.
- * Checks on-chain state and calls finalizeSettlement(key, true) for eligible escrows.
- */
-export const claimResourceEarnings = async (req: Request, res: Response) => {
-    try {
-        const userId = (req as any).userId;
-        const resourceId = req.params.resourceId as string;
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-        // Verify resource belongs to user
-        const resource = await prisma.resource.findFirst({ where: { id: resourceId, userId } });
-        if (!resource) return res.status(404).json({ error: 'Resource not found' });
-
-        // Find all PENDING transactions with escrow keys for this resource
-        const pendingTxns = await prisma.transaction.findMany({
-            where: {
-                resourceId,
-                userId,
-                status: 'PENDING',
-                paymentTransactionId: { not: null },
-            },
-        });
-
-        if (pendingTxns.length === 0) {
-            return res.json({ success: true, claimed: 0, message: 'No pending transactions to claim' });
-        }
-
-        let claimed = 0;
-        let claimedAmount = 0;
-        const errors: string[] = [];
-
-        for (const tx of pendingTxns) {
-            const escrowKey = tx.paymentTransactionId!;
-            try {
-                // Check on-chain state — finalization is handled by CRE settlement-verifier
-                const escrow = await getEscrowOnChain(escrowKey);
-
-                if (escrow.state === EscrowState.Settled) {
-                    // CRE already settled on-chain, sync DB
-                    await prisma.transaction.update({
-                        where: { id: tx.id },
-                        data: { status: 'SETTLED' },
-                    });
-                    claimed++;
-                    claimedAmount += tx.amount;
-                } else if (escrow.state === EscrowState.SettlementRequested || escrow.state === EscrowState.Funded) {
-                    // CRE hasn't finalized yet — skip, don't finalize directly
-                    errors.push(`Escrow ${escrowKey.slice(0, 10)}... awaiting CRE settlement`);
-                } else {
-                    errors.push(`Escrow ${escrowKey.slice(0, 10)}... in state ${escrow.state} — not claimable`);
-                }
-            } catch (err: any) {
-                errors.push(`${escrowKey.slice(0, 10)}...: ${err.message}`);
-            }
-        }
-
-        return res.json({
-            success: true,
-            claimed,
-            claimedAmount: claimedAmount.toFixed(5),
-            total: pendingTxns.length,
-            errors: errors.length > 0 ? errors : undefined,
-            message: `Claimed ${claimed}/${pendingTxns.length} transactions (${claimedAmount.toFixed(5)} ETH)`,
-        });
-    } catch (error) {
-        console.error('Claim earnings error:', error);
-        return res.status(500).json({ error: 'Failed to claim earnings' });
-    }
-};
