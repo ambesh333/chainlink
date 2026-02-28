@@ -5,8 +5,8 @@ import { useAccount, useWalletClient, usePublicClient, useChainId } from 'wagmi'
 import { sepolia } from 'wagmi/chains';
 import { getApiUrl } from '@/lib/config';
 
-// Minimal ABI — deposit + requestSettlement needed in the frontend
-const ESCROW_ABI = [
+// Minimal ABIs — split by stateMutability so viem can narrow types correctly
+const DEPOSIT_ABI = [
     {
         type: 'function',
         name: 'deposit',
@@ -14,9 +14,19 @@ const ESCROW_ABI = [
         outputs: [],
         stateMutability: 'payable',
     },
+] as const;
+
+const ESCROW_ABI = [
     {
         type: 'function',
         name: 'requestSettlement',
+        inputs: [{ name: 'key', type: 'bytes32' }],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'raiseDispute',
         inputs: [{ name: 'key', type: 'bytes32' }],
         outputs: [],
         stateMutability: 'nonpayable',
@@ -279,9 +289,10 @@ export default function DemoPage() {
 
         try {
             // Sign & broadcast: deposit(bytes32 key) payable
-            const txHash = await walletClient.writeContract({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const txHash = await (walletClient as any).writeContract({
                 address: contract,
-                abi: ESCROW_ABI,
+                abi: DEPOSIT_ABI,
                 functionName: 'deposit',
                 args: [key],
                 value,
@@ -446,6 +457,35 @@ export default function DemoPage() {
         addLine(status === 'SETTLED' ? 'Confirming receipt...' : 'Submitting dispute...', 'info');
 
         try {
+            // Call raiseDispute() on-chain before notifying backend
+            if (status === 'DISPUTED' && walletClient && paymentState) {
+                const key = paymentState.escrowKey as `0x${string}`;
+                const contract = paymentState.contractAddress as `0x${string}`;
+
+                addLine('Calling raiseDispute() on-chain...', 'info');
+
+                const disputeTxHash = await (walletClient as any).writeContract({
+                    address: contract,
+                    abi: ESCROW_ABI,
+                    functionName: 'raiseDispute',
+                    args: [key],
+                });
+
+                addLine(`✓ raiseDispute TX submitted`, 'success');
+                addLine(`  Hash: ${disputeTxHash.slice(0, 18)}...${disputeTxHash.slice(-10)}`, 'info');
+                addLine(`  https://sepolia.etherscan.io/tx/${disputeTxHash}`, 'info');
+                addLine('', 'normal');
+                addLine('Waiting for on-chain confirmation...', 'info');
+
+                if (publicClient) {
+                    await publicClient.waitForTransactionReceipt({ hash: disputeTxHash });
+                }
+
+                addLine('✓ Dispute raised on-chain', 'success');
+                addLine('', 'normal');
+                addLine('Notifying backend...', 'info');
+            }
+
             // Call requestSettlement() on-chain before notifying backend
             if (status === 'SETTLED' && walletClient && paymentState) {
                 const key = paymentState.escrowKey as `0x${string}`;
@@ -453,7 +493,7 @@ export default function DemoPage() {
 
                 addLine('Calling requestSettlement() on-chain...', 'info');
 
-                const settleTxHash = await walletClient.writeContract({
+                const settleTxHash = await (walletClient as any).writeContract({
                     address: contract,
                     abi: ESCROW_ABI,
                     functionName: 'requestSettlement',

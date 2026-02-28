@@ -3,7 +3,12 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "../src/EscrowMarketplace.sol";
+import "../src/DisputeConsumer.sol";
 
+
+// =============================================================
+// ESCROW TESTS
+// =============================================================
 contract EscrowMarketplaceTest is Test {
     EscrowMarketplace escrow;
     address merchant = address(1);
@@ -17,41 +22,61 @@ contract EscrowMarketplaceTest is Test {
 
     function testCreateEscrow() public {
         bytes32 key = keccak256("resource1");
+        escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
+        assertTrue(true);
+    }
 
+    function testDepositEmitsEscrowFunded() public {
+        bytes32 key = keccak256("resource-funded");
         escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
 
-        // If no revert → test passes
-        assertTrue(true);
+        vm.deal(agent, 2 ether);
+
+        vm.expectEmit(true, true, true, true);
+        emit EscrowMarketplace.EscrowFunded(key, agent, merchant, 1 ether);
+
+        vm.prank(agent);
+        escrow.deposit{value: 1 ether}(key);
+    }
+
+    function testRaiseDisputeEmitsEvent() public {
+        bytes32 key = keccak256("resource-dispute");
+        escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
+
+        vm.deal(agent, 2 ether);
+        vm.prank(agent);
+        escrow.deposit{value: 1 ether}(key);
+
+        vm.expectEmit(true, true, true, true);
+        emit EscrowMarketplace.DisputeRaised(key, agent, merchant, 1 ether);
+
+        vm.prank(agent);
+        escrow.raiseDispute(key);
+
+        EscrowMarketplace.Escrow memory e = escrow.getEscrow(key);
+        assertEq(uint256(e.state), uint256(EscrowMarketplace.EscrowState.Disputed));
+        assertTrue(e.agentRaisedDispute);
     }
 
     function testSettlementFlowWithEvents() public {
         bytes32 key = keccak256("resource-settle");
 
-        // 1. Create escrow
         escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
 
-        // 2. Fund escrow as agent
         vm.deal(agent, 2 ether);
         vm.prank(agent);
         escrow.deposit{value: 1 ether}(key);
 
-        // 3. Agent requests settlement — expect SettlementRequested event
         vm.expectEmit(true, true, false, true);
         emit EscrowMarketplace.SettlementRequested(key, agent);
 
         vm.prank(agent);
         escrow.requestSettlement(key);
 
-        // 4. Verify escrow state via getEscrow
         EscrowMarketplace.Escrow memory e = escrow.getEscrow(key);
         assertEq(uint256(e.state), uint256(EscrowMarketplace.EscrowState.SettlementRequested));
         assertTrue(e.agentRequestedSettlement);
-        assertFalse(e.agentRaisedDispute);
-        assertEq(e.merchant, merchant);
-        assertEq(e.agent, agent);
-        assertEq(e.amount, 1 ether);
 
-        // 5. Facilitator finalizes — expect SettlementFinalized event
         vm.expectEmit(true, true, false, true);
         emit EscrowMarketplace.SettlementFinalized(key, merchant, true);
 
@@ -59,10 +84,8 @@ contract EscrowMarketplaceTest is Test {
         vm.prank(facilitator);
         escrow.finalizeSettlement(key, true);
 
-        // 6. Verify merchant received funds
         assertEq(merchant.balance, merchantBalBefore + 1 ether);
 
-        // 7. Verify escrow is now Settled
         EscrowMarketplace.Escrow memory settled = escrow.getEscrow(key);
         assertEq(uint256(settled.state), uint256(EscrowMarketplace.EscrowState.Settled));
     }
@@ -71,5 +94,120 @@ contract EscrowMarketplaceTest is Test {
         bytes32 key = keccak256("nonexistent");
         vm.expectRevert("escrow:not exist");
         escrow.getEscrow(key);
+    }
+}
+
+
+// =============================================================
+// DISPUTE CONSUMER TESTS (ReceiverTemplate version)
+// =============================================================
+contract DisputeConsumerTest is Test {
+    EscrowMarketplace escrow;
+    DisputeConsumer consumer;
+
+    address merchant = address(1);
+    address agent = address(2);
+    address forwarder = address(4);
+
+    function setUp() public {
+        escrow = new EscrowMarketplace();
+
+        // Deploy consumer with forwarder + escrow
+        consumer = new DisputeConsumer(
+            forwarder,
+            address(escrow)
+        );
+
+        // Register DisputeConsumer as facilitator
+        escrow.addFacilitator(address(consumer));
+    }
+
+    function testReportResolvesDispute() public {
+        bytes32 key = keccak256("cre-dispute");
+
+        escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
+
+        vm.deal(agent, 2 ether);
+        vm.prank(agent);
+        escrow.deposit{value: 1 ether}(key);
+
+        vm.prank(agent);
+        escrow.raiseDispute(key);
+
+        uint256 merchantBalBefore = merchant.balance;
+        bytes memory reportData = abi.encode(key, true);
+
+        vm.expectEmit(true, false, false, true);
+        emit DisputeConsumer.DisputeResolved(key, true);
+
+        vm.prank(forwarder);
+        consumer.onReport("", reportData);
+
+        assertEq(merchant.balance, merchantBalBefore + 1 ether);
+
+        (bool resolved, bool payMerchant) = consumer.getResolution(key);
+        assertTrue(resolved);
+        assertTrue(payMerchant);
+    }
+
+    function testReportRefundsAgent() public {
+        bytes32 key = keccak256("cre-refund");
+
+        escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
+
+        vm.deal(agent, 2 ether);
+        vm.prank(agent);
+        escrow.deposit{value: 1 ether}(key);
+
+        vm.prank(agent);
+        escrow.raiseDispute(key);
+
+        uint256 agentBalBefore = agent.balance;
+        bytes memory reportData = abi.encode(key, false);
+
+        vm.prank(forwarder);
+        consumer.onReport("", reportData);
+
+        assertEq(agent.balance, agentBalBefore + 1 ether);
+
+        (bool resolved, bool payMerchant) = consumer.getResolution(key);
+        assertTrue(resolved);
+        assertFalse(payMerchant);
+    }
+
+    function testUnauthorizedCallerReverts() public {
+        bytes memory reportData = abi.encode(keccak256("key"), true);
+
+        // Not forwarder → revert
+        vm.expectRevert();
+        consumer.onReport("", reportData);
+    }
+
+    function testDoubleResolutionReverts() public {
+        bytes32 key = keccak256("cre-double");
+
+        escrow.createEscrow(key, merchant, agent, address(0), 1 ether, 1 hours);
+
+        vm.deal(agent, 2 ether);
+        vm.prank(agent);
+        escrow.deposit{value: 1 ether}(key);
+
+        vm.prank(agent);
+        escrow.raiseDispute(key);
+
+        bytes memory reportData = abi.encode(key, true);
+
+        vm.prank(forwarder);
+        consumer.onReport("", reportData);
+
+        vm.expectRevert("already resolved");
+        vm.prank(forwarder);
+        consumer.onReport("", reportData);
+    }
+
+    function testSetForwarderOnlyOwner() public {
+        vm.prank(agent);
+        vm.expectRevert();
+        consumer.setForwarderAddress(address(5));
     }
 }

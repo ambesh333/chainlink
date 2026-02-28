@@ -1,0 +1,5 @@
+{
+  "schedule": "*/60 * * * * *",
+  "escrowContractAddress": "0x4290721c3a000A23b77B12E971A51ae3a2a4CB06",
+  "chainName": "ethereum-testnet-sepolia"
+}

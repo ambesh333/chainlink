@@ -1,0 +1,23 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE — Expiry Watchdog
+# ==========================================================================
+# Cron-triggered workflow that checks for expired escrows on-chain
+# and logs/flags them for cleanup.
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "expiry-watchdog-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "expiry-watchdog-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""

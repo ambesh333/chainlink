@@ -1,0 +1,23 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE — Settlement Verifier
+# ==========================================================================
+# Listens for SettlementRequested events, verifies resource delivery via
+# backend API, and auto-finalizes settlement on-chain if verified.
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "settlement-verifier-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: "../secrets-no-ai.yaml"
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "settlement-verifier-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: "../secrets-no-ai.yaml"

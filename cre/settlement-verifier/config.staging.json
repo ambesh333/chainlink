@@ -1,0 +1,6 @@
+{
+  "escrowContractAddress": "0x4290721c3a000A23b77B12E971A51ae3a2a4CB06",
+  "disputeConsumerAddress": "0x0000000000000000000000000000000000000000",
+  "backendUrl": "http://localhost:3001/api",
+  "chainName": "ethereum-testnet-sepolia"
+}

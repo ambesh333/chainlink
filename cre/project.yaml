@@ -1,0 +1,22 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS FILE
+# ==========================================================================
+# Chainlink Agent Marketplace — CRE workflows for decentralized dispute
+# resolution, auto-settlement verification, and expiry watchdog.
+#
+# Workflows:
+#   - dispute-resolver:    AI-powered dispute resolution via Confidential HTTP
+#   - settlement-verifier: Auto-verify resource delivery and finalize settlement
+#   - expiry-watchdog:     Cron-based expired escrow cleanup
+
+# ==========================================================================
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://eth-sepolia.g.alchemy.com/v2/MNt08S8YEduoK3eZYYf57cUrS6ZeLURb
+
+# ==========================================================================
+production-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://eth-sepolia.g.alchemy.com/v2/MNt08S8YEduoK3eZYYf57cUrS6ZeLURb

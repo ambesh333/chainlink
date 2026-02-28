@@ -123,6 +123,28 @@
     },
     {
         "type": "event",
+        "name": "DisputeRaised",
+        "inputs": [
+            { "name": "key",      "type": "bytes32", "indexed": true,  "internalType": "bytes32" },
+            { "name": "agent",    "type": "address", "indexed": true,  "internalType": "address" },
+            { "name": "merchant", "type": "address", "indexed": true,  "internalType": "address" },
+            { "name": "amount",   "type": "uint256", "indexed": false, "internalType": "uint256" }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "EscrowFunded",
+        "inputs": [
+            { "name": "key",      "type": "bytes32", "indexed": true,  "internalType": "bytes32" },
+            { "name": "agent",    "type": "address", "indexed": true,  "internalType": "address" },
+            { "name": "merchant", "type": "address", "indexed": true,  "internalType": "address" },
+            { "name": "amount",   "type": "uint256", "indexed": false, "internalType": "uint256" }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
         "name": "SettlementRequested",
         "inputs": [
             { "name": "key",   "type": "bytes32", "indexed": true,  "internalType": "bytes32" },

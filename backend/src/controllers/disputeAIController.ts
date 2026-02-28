@@ -7,7 +7,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../context';
 import { analyzeDispute, AnalysisInput } from '../services/aiDisputeService';
-import { finalizeSettlementOnChain } from '../clients/escrowClient';
+import { finalizeSettlementOnChain, getEscrowOnChain, EscrowState } from '../clients/escrowClient';
 
 /**
  * POST /api/disputes/:transactionId/ai-analyze
@@ -246,7 +246,8 @@ export const resolveAIDispute = async (req: Request, res: Response) => {
 
 /**
  * GET /api/disputes
- * Fetch all active disputes for the authenticated merchant
+ * Fetch all active disputes for the authenticated merchant.
+ * Includes CRE workflow resolution status when available.
  */
 export const getDisputes = async (req: Request, res: Response) => {
     try {
@@ -259,7 +260,7 @@ export const getDisputes = async (req: Request, res: Response) => {
         const disputes = await prisma.transaction.findMany({
             where: {
                 userId,
-                status: 'REFUND_REQUESTED'
+                status: { in: ['REFUND_REQUESTED', 'SETTLED', 'REFUNDED'] }
             },
             include: {
                 resource: { select: { title: true, type: true } }
@@ -267,20 +268,51 @@ export const getDisputes = async (req: Request, res: Response) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        const formattedDisputes = disputes.map(tx => ({
-            id: tx.id,
-            transactionId: tx.id,
-            receiptCode: tx.receiptCode,
-            agentId: tx.agentId,
-            amount: tx.amount,
-            encryptedReason: tx.encryptedDisputeReason || '',
-            resourceName: tx.resource?.title || 'Unknown Resource',
-            createdAt: tx.createdAt.toISOString(),
-            aiDecision: (tx as any).aiDecision || null,
-            aiReasoning: (tx as any).aiReasoning || null,
-            aiConfidence: (tx as any).aiConfidence || null,
-            aiAnalyzedAt: (tx as any).aiAnalyzedAt?.toISOString() || null,
-            merchantExplanation: (tx as any).merchantExplanation || null,
+        const formattedDisputes = await Promise.all(disputes.map(async (tx) => {
+            // Check CRE on-chain resolution status (only for pending disputes)
+            let creStatus: string | null = null;
+            const escrowKey = tx.paymentTransactionId;
+            if (escrowKey && tx.status === 'REFUND_REQUESTED') {
+                try {
+                    const escrow = await getEscrowOnChain(escrowKey);
+                    if (escrow.state === EscrowState.Disputed) {
+                        creStatus = 'CRE_PROCESSING';
+                    } else if (escrow.state === EscrowState.Settled) {
+                        creStatus = 'CRE_RESOLVED';
+                    }
+                } catch {
+                    // Escrow not found on-chain — no CRE status
+                }
+            }
+
+            // Determine resolution and fund flow
+            let resolution: 'pending' | 'refunded_to_agent' | 'paid_to_merchant' = 'pending';
+            if (tx.status === 'REFUNDED') {
+                resolution = 'refunded_to_agent';
+            } else if (tx.status === 'SETTLED') {
+                resolution = 'paid_to_merchant';
+            }
+
+            return {
+                id: tx.id,
+                transactionId: tx.id,
+                receiptCode: tx.receiptCode,
+                agentId: tx.agentId,
+                amount: tx.amount,
+                status: tx.status,
+                escrowKey: escrowKey || null,
+                encryptedReason: tx.encryptedDisputeReason || '',
+                resourceName: tx.resource?.title || 'Unknown Resource',
+                createdAt: tx.createdAt.toISOString(),
+                resolution,
+                resolvedAt: tx.status !== 'REFUND_REQUESTED' ? tx.updatedAt.toISOString() : null,
+                aiDecision: (tx as any).aiDecision || null,
+                aiReasoning: (tx as any).aiReasoning || null,
+                aiConfidence: (tx as any).aiConfidence || null,
+                aiAnalyzedAt: (tx as any).aiAnalyzedAt?.toISOString() || null,
+                merchantExplanation: (tx as any).merchantExplanation || null,
+                creStatus,
+            };
         }));
 
         return res.json({ disputes: formattedDisputes });

@@ -1,0 +1,19 @@
+{
+  "name": "@chainlink-agent/cre",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "bun x cre-setup",
+    "simulate:dispute": "./scripts/simulate.sh dispute",
+    "simulate:settle": "./scripts/simulate.sh settle",
+    "simulate:expiry": "./scripts/simulate.sh expiry",
+    "simulate:all": "./scripts/simulate.sh all"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.1.2"
+  },
+  "devDependencies": {
+    "@types/bun": "1.2.21"
+  }
+}

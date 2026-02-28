@@ -2,3 +2,12 @@ node_modules/
 dist/
 .env
 *.log
+
+claude update
+
+cre workflow simulate ./dispute-resolver \
+      --target staging-settings \
+      --evm-tx-hash 0x7ef0873ad3ec4a56f8e3d17d437bbc2fd625870824f7290023f20aa321b63c76 \
+      --evm-event-index 0 \
+      --broadcast \
+      --non-interactive

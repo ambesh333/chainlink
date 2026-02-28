@@ -37,6 +37,8 @@ contract EscrowMarketplace {
         bool agentRaisedDispute;
     }
 
+    event EscrowFunded(bytes32 indexed key, address indexed agent, address indexed merchant, uint256 amount);
+    event DisputeRaised(bytes32 indexed key, address indexed agent, address indexed merchant, uint256 amount);
     event SettlementRequested(bytes32 indexed key, address indexed agent);
     event SettlementFinalized(bytes32 indexed key, address indexed merchant, bool payMerchant);
 
@@ -157,6 +159,8 @@ contract EscrowMarketplace {
 
         lockedForMerchant[e.merchant] += e.amount;
         lockedForResource[key] += e.amount;
+
+        emit EscrowFunded(key, msg.sender, e.merchant, e.amount);
     }
 
     // ---------------------------------------------------------
@@ -185,6 +189,8 @@ contract EscrowMarketplace {
 
         e.agentRaisedDispute = true;
         e.state = EscrowState.Disputed;
+
+        emit DisputeRaised(key, msg.sender, e.merchant, e.amount);
     }
 
     // ---------------------------------------------------------

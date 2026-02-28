@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Bot, CheckCircle, RefreshCw, Loader2, ArrowLeft, MessageSquarePlus, ArrowUpRight } from 'lucide-react';
+import { Bot, CheckCircle, Loader2, ArrowLeft, ArrowUpRight, Link2, Zap, Shield, ArrowDownLeft, ArrowUpFromLine } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { getApiUrl } from '@/lib/config';
 
@@ -13,11 +13,16 @@ interface Dispute {
     resourceName: string;
     createdAt: string;
     receiptCode: string | null;
+    escrowKey: string | null;
+    status: 'REFUND_REQUESTED' | 'SETTLED' | 'REFUNDED';
+    resolution: 'pending' | 'refunded_to_agent' | 'paid_to_merchant';
+    resolvedAt: string | null;
     aiDecision: 'AI_VALID' | 'AI_INVALID' | null;
     aiReasoning: string | null;
     aiConfidence: number | null;
     aiAnalyzedAt: string | null;
     merchantExplanation: string | null;
+    creStatus: 'CRE_PROCESSING' | 'CRE_RESOLVED' | null;
 }
 
 export default function DisputesPage() {
@@ -25,10 +30,6 @@ export default function DisputesPage() {
     const [disputes, setDisputes] = useState<Dispute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
-    const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
-    const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-    const [showExplanationForm, setShowExplanationForm] = useState(false);
-    const [explanationText, setExplanationText] = useState('');
 
     const getHeaders = () => {
         const token = getToken();
@@ -62,253 +63,304 @@ export default function DisputesPage() {
 
     useEffect(() => { fetchDisputes(); }, []);
 
-    const handleAIAnalyze = async (transactionId: string) => {
-        setAnalyzingIds(prev => new Set(prev).add(transactionId));
-        try {
-            const API_URL = getApiUrl();
-            const response = await fetch(`${API_URL}/disputes/${transactionId}/ai-analyze`, {
-                method: 'POST',
-                headers: getHeaders(),
-                credentials: 'include',
-            });
-            const data = await response.json();
-            if (response.ok && data.success) {
-                await fetchDisputes();
-            } else {
-                alert(`AI Analysis failed: ${data.error}`);
-            }
-        } catch (error: any) {
-            alert(`AI analysis failed: ${error.message}`);
-        } finally {
-            setAnalyzingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
-        }
-    };
+    // Auto-refresh when CRE is processing
+    useEffect(() => {
+        const hasProcessing = disputes.some(d => d.resolution === 'pending');
+        if (!hasProcessing) return;
 
-    const handleSubmitExplanation = async (transactionId: string) => {
-        if (!explanationText.trim()) { alert('Please enter your explanation.'); return; }
-        setAnalyzingIds(prev => new Set(prev).add(transactionId));
-        try {
-            const API_URL = getApiUrl();
-            const response = await fetch(`${API_URL}/disputes/${transactionId}/merchant-explain`, {
-                method: 'POST',
-                headers: getHeaders(),
-                credentials: 'include',
-                body: JSON.stringify({ explanation: explanationText })
-            });
-            const data = await response.json();
-            if (response.ok && data.success) {
-                setShowExplanationForm(false);
-                setExplanationText('');
-                await fetchDisputes();
-            } else {
-                alert(`Error: ${data.error}`);
-            }
-        } catch (error: any) {
-            alert(`Failed: ${error.message}`);
-        } finally {
-            setAnalyzingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
-        }
-    };
+        const interval = setInterval(fetchDisputes, 10000);
+        return () => clearInterval(interval);
+    }, [disputes]);
 
-    const handleResolve = async (transactionId: string, decision: 'APPROVE' | 'REJECT') => {
-        setResolvingIds(prev => new Set(prev).add(transactionId));
-        try {
-            const API_URL = getApiUrl();
-            const response = await fetch(`${API_URL}/disputes/${transactionId}/resolve`, {
-                method: 'POST',
-                headers: getHeaders(),
-                credentials: 'include',
-                body: JSON.stringify({ decision })
-            });
-            const data = await response.json();
-            if (response.ok && data.success) {
-                alert(data.message);
-                setDisputes(prev => prev.filter(d => d.id !== transactionId));
-                setSelectedDispute(null);
-            } else {
-                alert(`Error: ${data.error}`);
-            }
-        } catch (error: any) {
-            alert(`Failed: ${error.message}`);
-        } finally {
-            setResolvingIds(prev => { const s = new Set(prev); s.delete(transactionId); return s; });
+    const getOutcomeBadge = (dispute: Dispute) => {
+        if (dispute.resolution === 'paid_to_merchant') {
+            return (
+                <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1.5">
+                    <ArrowDownLeft size={10} />
+                    Funds &rarr; Merchant
+                </span>
+            );
         }
+        if (dispute.resolution === 'refunded_to_agent') {
+            return (
+                <span className="px-3 py-1 text-xs font-medium rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center gap-1.5">
+                    <ArrowUpFromLine size={10} />
+                    Refunded to Agent
+                </span>
+            );
+        }
+        // pending
+        if (dispute.creStatus === 'CRE_PROCESSING') {
+            return (
+                <span className="px-3 py-1 text-xs font-medium rounded-full bg-[#375BD2]/20 text-[#375BD2] border border-[#375BD2]/30 flex items-center gap-1.5">
+                    <Loader2 size={10} className="animate-spin" />
+                    CRE Processing
+                </span>
+            );
+        }
+        return (
+            <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex items-center gap-1.5">
+                <Loader2 size={10} className="animate-spin" />
+                Pending
+            </span>
+        );
     };
 
     const getStatusBadge = (dispute: Dispute) => {
-        if (!dispute.aiDecision) {
-            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">Pending</span>;
+        if (dispute.resolution !== 'pending') {
+            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-300 border border-gray-500/30">Resolved</span>;
         }
-        if (dispute.aiDecision === 'AI_VALID') {
-            return <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400 border border-red-500/30">Valid</span>;
-        }
-        return <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">Invalid</span>;
+        return <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Active</span>;
+    };
+
+    // ============= CRE TIMELINE COMPONENT =============
+    const CRETimeline = ({ dispute }: { dispute: Dispute }) => {
+        if (!dispute.escrowKey) return null;
+
+        const isResolved = dispute.resolution !== 'pending';
+
+        const steps = [
+            {
+                label: 'Dispute Raised',
+                icon: <Zap size={14} />,
+                done: true,
+                description: 'On-chain DisputeRaised event emitted',
+            },
+            {
+                label: 'CRE Processing',
+                icon: <Loader2 size={14} className={dispute.creStatus === 'CRE_PROCESSING' ? 'animate-spin' : ''} />,
+                done: dispute.creStatus === 'CRE_PROCESSING' || dispute.creStatus === 'CRE_RESOLVED' || !!dispute.aiDecision || isResolved,
+                active: dispute.creStatus === 'CRE_PROCESSING',
+                description: 'CRE workflow picks up event, calls AI via Confidential HTTP',
+            },
+            {
+                label: 'AI Analysis',
+                icon: <Bot size={14} />,
+                done: !!dispute.aiDecision || dispute.creStatus === 'CRE_RESOLVED' || isResolved,
+                description: dispute.aiReasoning || 'Dual-LLM AI analyzes dispute context',
+            },
+            {
+                label: 'On-chain Resolution',
+                icon: <Shield size={14} />,
+                done: dispute.creStatus === 'CRE_RESOLVED' || isResolved,
+                description: isResolved
+                    ? `Resolved: ${dispute.resolution === 'paid_to_merchant' ? 'Funds released to merchant' : 'Funds refunded to agent'}`
+                    : 'CRE writes resolution to DisputeConsumer contract',
+            },
+        ];
+
+        return (
+            <div className="mt-6 p-4 bg-[#0a0a1a] rounded-xl border border-[#375BD2]/20">
+                <div className="flex items-center gap-2 mb-4">
+                    <Link2 size={14} className="text-[#375BD2]" />
+                    <span className="text-xs font-medium text-[#375BD2] uppercase tracking-wider">CRE Workflow Timeline</span>
+                </div>
+
+                <div className="space-y-0">
+                    {steps.map((step, index) => (
+                        <div key={step.label} className="flex items-start gap-3">
+                            <div className="flex flex-col items-center">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center border ${step.done
+                                    ? 'bg-[#375BD2]/20 border-[#375BD2]/50 text-[#375BD2]'
+                                    : step.active
+                                        ? 'bg-[#375BD2]/10 border-[#375BD2]/30 text-[#375BD2] animate-pulse'
+                                        : 'bg-gray-800/50 border-gray-700 text-gray-600'
+                                    }`}>
+                                    {step.icon}
+                                </div>
+                                {index < steps.length - 1 && (
+                                    <div className={`w-px h-8 ${step.done ? 'bg-[#375BD2]/30' : 'bg-gray-800'}`} />
+                                )}
+                            </div>
+
+                            <div className="pb-6">
+                                <div className={`text-sm font-medium ${step.done ? 'text-white' : 'text-gray-500'}`}>
+                                    {step.label}
+                                    {step.active && (
+                                        <span className="ml-2 text-xs text-[#375BD2]">In Progress...</span>
+                                    )}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5">
+                                    {step.description}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Escrow Key */}
+                <div className="mt-2 pt-3 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600">Escrow Key:</span>
+                        <code className="text-xs text-gray-400 font-mono bg-black/30 px-2 py-0.5 rounded">
+                            {dispute.escrowKey!.slice(0, 10)}...{dispute.escrowKey!.slice(-8)}
+                        </code>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     // ============= DETAIL CARD VIEW =============
     if (selectedDispute) {
         const dispute = disputes.find(d => d.id === selectedDispute.id) || selectedDispute;
-        const isAnalyzing = analyzingIds.has(dispute.id);
-        const isResolving = resolvingIds.has(dispute.id);
-        const isDisputeValid = dispute.aiDecision === 'AI_VALID';
+        const isCREProcessing = dispute.creStatus === 'CRE_PROCESSING';
+        const isResolved = dispute.resolution !== 'pending';
         const confidence = dispute.aiConfidence || 0;
-
-        const validSteps = ['AI Analysis', 'Your Response', 'Resolution'];
-        const invalidSteps = ['AI Analysis', 'Resolution'];
-        const steps = isDisputeValid ? validSteps : invalidSteps;
+        const isDisputeValid = dispute.aiDecision === 'AI_VALID';
 
         return (
             <div className="text-white p-6 flex items-center justify-center">
                 <div className="w-full max-w-lg">
                     {/* Back Button */}
                     <button
-                        onClick={() => { setSelectedDispute(null); setShowExplanationForm(false); }}
+                        onClick={() => setSelectedDispute(null)}
                         className="flex items-center gap-2 text-gray-500 hover:text-white mb-6 transition-colors text-sm"
                     >
                         <ArrowLeft size={16} />
                         <span>Back to Disputes</span>
                     </button>
 
+                    {/* CRE Processing Banner */}
+                    {isCREProcessing && (
+                        <div className="mb-4 p-4 bg-[#375BD2]/10 rounded-xl border border-[#375BD2]/20 flex items-center gap-3">
+                            <Loader2 size={18} className="text-[#375BD2] animate-spin" />
+                            <div>
+                                <div className="text-sm font-medium text-[#375BD2]">CRE Resolution In Progress</div>
+                                <div className="text-xs text-gray-400">Chainlink CRE workflow is analyzing this dispute on-chain</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Outcome Card (for resolved disputes) */}
+                    {isResolved && (
+                        <div className={`mb-4 p-4 rounded-xl border flex items-center gap-3 ${dispute.resolution === 'paid_to_merchant'
+                            ? 'bg-green-500/10 border-green-500/20'
+                            : 'bg-orange-500/10 border-orange-500/20'
+                            }`}>
+                            {dispute.resolution === 'paid_to_merchant' ? (
+                                <>
+                                    <ArrowDownLeft size={18} className="text-green-400" />
+                                    <div>
+                                        <div className="text-sm font-medium text-green-400">Funds Released to You</div>
+                                        <div className="text-xs text-gray-400">
+                                            The dispute was found invalid — you kept the payment
+                                            {dispute.resolvedAt && <span> on {new Date(dispute.resolvedAt).toLocaleDateString()}</span>}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowUpFromLine size={18} className="text-orange-400" />
+                                    <div>
+                                        <div className="text-sm font-medium text-orange-400">Refunded to Agent</div>
+                                        <div className="text-xs text-gray-400">
+                                            The dispute was found valid — funds were returned to the buyer
+                                            {dispute.resolvedAt && <span> on {new Date(dispute.resolvedAt).toLocaleDateString()}</span>}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {/* Main Card */}
                     <div className="relative bg-gradient-to-br from-[#1a1a2e] via-[#141420] to-[#0f1a0f] rounded-3xl border border-white/10 overflow-hidden">
                         {/* Glow Effect */}
-                        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] rounded-full blur-[100px] opacity-30 ${isDisputeValid ? 'bg-red-500' : 'bg-green-500'}`} />
+                        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] rounded-full blur-[100px] opacity-30 ${isCREProcessing
+                            ? 'bg-[#375BD2]'
+                            : isResolved
+                                ? dispute.resolution === 'paid_to_merchant' ? 'bg-green-500' : 'bg-orange-500'
+                                : 'bg-gray-500'
+                            }`} />
 
                         {/* Card Header */}
                         <div className="relative p-6 flex items-center justify-between border-b border-white/5">
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${isDisputeValid ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
-                                    <Bot size={18} className={isDisputeValid ? 'text-red-400' : 'text-green-400'} />
+                                <div className={`p-2 rounded-xl ${isCREProcessing
+                                    ? 'bg-[#375BD2]/20'
+                                    : isResolved
+                                        ? dispute.resolution === 'paid_to_merchant' ? 'bg-green-500/20' : 'bg-orange-500/20'
+                                        : 'bg-gray-500/20'
+                                    }`}>
+                                    {isCREProcessing
+                                        ? <Link2 size={18} className="text-[#375BD2]" />
+                                        : <Bot size={18} className={
+                                            isResolved
+                                                ? dispute.resolution === 'paid_to_merchant' ? 'text-green-400' : 'text-orange-400'
+                                                : 'text-gray-400'
+                                        } />
+                                    }
                                 </div>
-                                <span className="text-white font-medium">AI Insight</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="px-3 py-1.5 bg-[#252525] rounded-full text-xs text-gray-300 border border-white/10">
-                                    {dispute.resourceName}
+                                <span className="text-white font-medium">
+                                    {isCREProcessing ? 'CRE Workflow' : 'AI Verdict'}
                                 </span>
-                                <button
-                                    onClick={() => handleAIAnalyze(dispute.id)}
-                                    className="p-2 bg-[#252525] rounded-full border border-white/10 hover:bg-[#333]"
-                                >
-                                    <RefreshCw size={14} className="text-gray-400" />
-                                </button>
                             </div>
+                            <span className="px-3 py-1.5 bg-[#252525] rounded-full text-xs text-gray-300 border border-white/10">
+                                {dispute.resourceName}
+                            </span>
                         </div>
 
                         {/* Card Content */}
                         <div className="relative p-8">
-                            {/* Large Confidence Percentage */}
-                            <div className="mb-6">
-                                <div className="flex items-start gap-2">
-                                    <span className="text-7xl font-extralight text-white tracking-tight">
-                                        {confidence}%
-                                    </span>
-                                    <ArrowUpRight size={24} className={`mt-3 ${isDisputeValid ? 'text-red-400' : 'text-green-400'}`} />
+                            {isCREProcessing ? (
+                                <div className="text-center py-4">
+                                    <Loader2 size={40} className="text-[#375BD2] animate-spin mx-auto mb-4" />
+                                    <div className="text-lg font-medium text-white mb-2">CRE Analyzing Dispute</div>
+                                    <p className="text-gray-500 text-sm">
+                                        The Chainlink CRE workflow has picked up the DisputeRaised event
+                                        and is performing dual-LLM analysis via Confidential HTTP.
+                                    </p>
                                 </div>
-                            </div>
-
-                            {/* Status Text */}
-                            <div className="mb-4">
-                                <span className="text-white font-medium">
-                                    {isDisputeValid ? 'Dispute is valid' : 'Dispute is invalid'}
-                                </span>
-                                <span className="text-gray-500"> based on AI analysis.</span>
-                            </div>
-
-                            {/* Reasoning */}
-                            <p className="text-gray-600 text-sm leading-relaxed mb-8">
-                                {dispute.aiReasoning}
-                            </p>
-
-                            {/* Merchant Explanation (if exists) */}
-                            {dispute.merchantExplanation && (
-                                <div className="mb-6 p-4 bg-[#375BD2]/10 rounded-xl border border-[#375BD2]/20">
-                                    <div className="text-xs text-[#375BD2] mb-2">Your Response:</div>
-                                    <p className="text-sm text-blue-300">{dispute.merchantExplanation}</p>
-                                </div>
-                            )}
-
-                            {/* Explanation Form */}
-                            {showExplanationForm && isDisputeValid && (
-                                <div className="mb-6 space-y-3">
-                                    <textarea
-                                        value={explanationText}
-                                        onChange={(e) => setExplanationText(e.target.value)}
-                                        placeholder="Explain why this dispute should be reconsidered..."
-                                        className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:border-[#375BD2]/50 focus:outline-none resize-none"
-                                        rows={3}
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleSubmitExplanation(dispute.id)}
-                                            disabled={isAnalyzing}
-                                            className="flex-1 py-3 bg-[#252525] hover:bg-[#333] text-white text-sm font-medium rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all"
-                                        >
-                                            {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                            Submit & Re-analyze
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowExplanationForm(false); setExplanationText(''); }}
-                                            className="px-4 py-3 bg-[#1a1a1a] hover:bg-[#252525] text-gray-400 text-sm rounded-xl border border-white/10 transition-all"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            {!showExplanationForm && (
-                                <div className="flex gap-3">
-                                    {isDisputeValid ? (
-                                        <>
-                                            {!dispute.merchantExplanation && (
-                                                <button
-                                                    onClick={() => setShowExplanationForm(true)}
-                                                    className="flex-1 py-3.5 bg-[#252525] hover:bg-[#333] text-white text-sm font-medium rounded-xl border border-white/10 flex items-center justify-center gap-2 transition-all"
-                                                >
-                                                    <MessageSquarePlus size={16} />
-                                                    Your Reason
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleResolve(dispute.id, 'APPROVE')}
-                                                disabled={isResolving}
-                                                className="flex-1 py-3.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/30"
-                                            >
-                                                {isResolving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                                                Approve Refund
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleResolve(dispute.id, 'REJECT')}
-                                            disabled={isResolving}
-                                            className="w-full py-3.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/30"
-                                        >
-                                            {isResolving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                                            Close Case
-                                        </button>
+                            ) : (
+                                <>
+                                    {/* Large Confidence Percentage */}
+                                    {dispute.aiDecision && (
+                                        <div className="mb-6">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-7xl font-extralight text-white tracking-tight">
+                                                    {confidence}%
+                                                </span>
+                                                <ArrowUpRight size={24} className={`mt-3 ${isDisputeValid ? 'text-red-400' : 'text-green-400'}`} />
+                                            </div>
+                                        </div>
                                     )}
-                                </div>
-                            )}
-                        </div>
 
-                        {/* Step Carousel */}
-                        <div className="relative px-8 pb-6">
-                            <div className="flex items-center justify-center gap-2">
-                                {steps.map((step, index) => (
-                                    <div
-                                        key={step}
-                                        className={`h-1 rounded-full transition-all ${index === 0
-                                            ? 'w-8 bg-white'
-                                            : 'w-4 bg-gray-700'
-                                            }`}
-                                    />
-                                ))}
-                            </div>
+                                    {/* Status Text */}
+                                    <div className="mb-4">
+                                        <span className="text-white font-medium">
+                                            {dispute.aiDecision
+                                                ? isDisputeValid ? 'Dispute was valid' : 'Dispute was invalid'
+                                                : 'Awaiting AI analysis'}
+                                        </span>
+                                        {dispute.aiDecision && <span className="text-gray-500"> based on AI analysis.</span>}
+                                    </div>
+
+                                    {/* Reasoning */}
+                                    {dispute.aiReasoning && (
+                                        <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                                            {dispute.aiReasoning}
+                                        </p>
+                                    )}
+
+                                    {/* Dispute Reason from Agent */}
+                                    {dispute.encryptedReason && (
+                                        <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="text-xs text-gray-500 mb-2">Agent&apos;s Dispute Reason:</div>
+                                            <p className="text-sm text-gray-300">
+                                                {(() => {
+                                                    try { return atob(dispute.encryptedReason); } catch { return dispute.encryptedReason; }
+                                                })()}
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
+
+                    {/* CRE Timeline */}
+                    <CRETimeline dispute={dispute} />
 
                     {/* Amount Info */}
                     <div className="mt-4 text-center">
@@ -326,19 +378,30 @@ export default function DisputesPage() {
             {/* Header */}
             <div className="flex items-center gap-3 mb-8">
                 <div className="w-2 h-2 rounded-full bg-[#375BD2]"></div>
-                <h2 className="text-xl font-semibold text-white">Active Disputes</h2>
+                <h2 className="text-xl font-semibold text-white">Disputes</h2>
                 <span className="text-gray-500 text-sm">{disputes.length} Dispute{disputes.length !== 1 ? 's' : ''}</span>
             </div>
+
+            {/* CRE Info Banner */}
+            {disputes.some(d => d.creStatus) && (
+                <div className="mb-6 p-4 bg-[#375BD2]/5 rounded-xl border border-[#375BD2]/10 flex items-center gap-3">
+                    <Link2 size={16} className="text-[#375BD2]" />
+                    <span className="text-sm text-gray-400">
+                        Disputes are automatically resolved by <span className="text-[#375BD2] font-medium">Chainlink CRE</span> workflows on-chain
+                    </span>
+                </div>
+            )}
 
             {/* Table */}
             <div className="bg-[#0a0a0f] rounded-2xl border border-white/5 overflow-hidden">
                 {/* Table Header */}
-                <div className="grid grid-cols-[60px_1fr_1fr_120px_120px_140px] gap-4 px-6 py-4 border-b border-white/5 text-xs text-gray-500 uppercase tracking-wider">
+                <div className="grid grid-cols-[60px_1fr_1fr_120px_100px_160px_100px] gap-4 px-6 py-4 border-b border-white/5 text-xs text-gray-500 uppercase tracking-wider">
                     <div>No</div>
                     <div>Agent</div>
                     <div>Resource</div>
                     <div>Amount</div>
                     <div>Status</div>
+                    <div>Outcome</div>
                     <div className="text-right">Action</div>
                 </div>
 
@@ -351,74 +414,61 @@ export default function DisputesPage() {
                 ) : disputes.length === 0 ? (
                     <div className="p-12 text-center">
                         <CheckCircle className="w-10 h-10 mx-auto text-green-500/30 mb-3" />
-                        <p className="text-gray-500">No active disputes</p>
+                        <p className="text-gray-500">No disputes</p>
                     </div>
                 ) : (
-                    disputes.map((dispute, index) => {
-                        const isAnalyzing = analyzingIds.has(dispute.id);
-                        return (
-                            <div
-                                key={dispute.id}
-                                className="grid grid-cols-[60px_1fr_1fr_120px_120px_140px] gap-4 px-6 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors items-center"
-                            >
-                                {/* Number */}
-                                <div className="text-2xl font-bold text-gray-600 font-mono">
-                                    {String(index + 1).padStart(2, '0')}
-                                </div>
+                    disputes.map((dispute, index) => (
+                        <div
+                            key={dispute.id}
+                            className="grid grid-cols-[60px_1fr_1fr_120px_100px_160px_100px] gap-4 px-6 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors items-center"
+                        >
+                            {/* Number */}
+                            <div className="text-2xl font-bold text-gray-600 font-mono">
+                                {String(index + 1).padStart(2, '0')}
+                            </div>
 
-                                {/* Agent */}
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#375BD2] to-[#4C8BF5] flex items-center justify-center text-white font-bold text-xs">
-                                        {dispute.agentId.slice(0, 2).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <div className="font-mono text-sm text-white">
-                                            {dispute.agentId.slice(0, 6)}...{dispute.agentId.slice(-4)}
-                                        </div>
-                                        <div className="text-xs text-gray-500">Agent Wallet</div>
-                                    </div>
+                            {/* Agent */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#375BD2] to-[#4C8BF5] flex items-center justify-center text-white font-bold text-xs">
+                                    {dispute.agentId.slice(0, 2).toUpperCase()}
                                 </div>
-
-                                {/* Resource */}
                                 <div>
-                                    <div className="text-sm text-white">{dispute.resourceName}</div>
-                                    <div className="text-xs text-gray-500">#{dispute.receiptCode || dispute.id.slice(0, 8)}</div>
-                                </div>
-
-                                {/* Amount */}
-                                <div className="font-mono text-white font-medium">
-                                    {dispute.amount.toFixed(4)}
-                                    <span className="text-gray-500 text-xs ml-1">ETH</span>
-                                </div>
-
-                                {/* Status */}
-                                <div>{getStatusBadge(dispute)}</div>
-
-                                {/* Action */}
-                                <div className="text-right">
-                                    <button
-                                        onClick={() => dispute.aiDecision ? setSelectedDispute(dispute) : handleAIAnalyze(dispute.id)}
-                                        disabled={isAnalyzing}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${dispute.aiDecision
-                                            ? 'bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10'
-                                            : 'bg-[#1a1a2e] hover:bg-[#252540] text-gray-200 border border-white/10 hover:border-[#375BD2]/40 hover:shadow-[0_0_20px_rgba(55,91,210,0.15)]'
-                                            }`}
-                                    >
-                                        {isAnalyzing ? (
-                                            <Loader2 size={14} className="animate-spin mx-auto" />
-                                        ) : dispute.aiDecision ? (
-                                            'View'
-                                        ) : (
-                                            <span className="flex items-center gap-2">
-                                                <Bot size={14} />
-                                                Analyse
-                                            </span>
-                                        )}
-                                    </button>
+                                    <div className="font-mono text-sm text-white">
+                                        {dispute.agentId.slice(0, 6)}...{dispute.agentId.slice(-4)}
+                                    </div>
+                                    <div className="text-xs text-gray-500">Agent Wallet</div>
                                 </div>
                             </div>
-                        );
-                    })
+
+                            {/* Resource */}
+                            <div>
+                                <div className="text-sm text-white">{dispute.resourceName}</div>
+                                <div className="text-xs text-gray-500">#{dispute.receiptCode || dispute.id.slice(0, 8)}</div>
+                            </div>
+
+                            {/* Amount */}
+                            <div className="font-mono text-white font-medium">
+                                {dispute.amount.toFixed(4)}
+                                <span className="text-gray-500 text-xs ml-1">ETH</span>
+                            </div>
+
+                            {/* Status */}
+                            <div>{getStatusBadge(dispute)}</div>
+
+                            {/* Outcome */}
+                            <div>{getOutcomeBadge(dispute)}</div>
+
+                            {/* Action */}
+                            <div className="text-right">
+                                <button
+                                    onClick={() => setSelectedDispute(dispute)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10"
+                                >
+                                    View
+                                </button>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>
