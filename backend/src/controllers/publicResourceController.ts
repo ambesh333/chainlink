@@ -104,6 +104,41 @@ export const listAllPublicResources = async (_req: Request, res: Response) => {
 };
 
 /**
+ * GET /api/explore/popular
+ * Returns top 5 resources sorted by transaction count (most accessed).
+ */
+export const getPopularResources = async (_req: Request, res: Response) => {
+    try {
+        const resources = await prisma.resource.findMany({
+            where: { isActive: true },
+            include: {
+                transactions: { select: { id: true } },
+            },
+        });
+
+        const sorted = resources
+            .map((r) => ({
+                id: r.id,
+                title: r.title,
+                description: r.description,
+                type: r.type,
+                price: r.price,
+                network: r.network,
+                token: r.token,
+                createdAt: r.createdAt,
+                transactionCount: r.transactions.length,
+            }))
+            .sort((a, b) => b.transactionCount - a.transactionCount)
+            .slice(0, 5);
+
+        return res.json({ resources: sorted });
+    } catch (error) {
+        console.error('Get popular resources error:', error);
+        return res.status(500).json({ error: 'Failed to fetch popular resources' });
+    }
+};
+
+/**
  * GET /api/explore/:id
  * Get a single resource (public) with trust score and payment info.
  */

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
     listAllPublicResources,
+    getPopularResources,
     getPublicResource,
     accessResource,
 } from '../controllers/publicResourceController';
@@ -11,6 +12,9 @@ const router = Router();
 
 // GET /api/explore - List all active resources with trust scores
 router.get('/', listAllPublicResources);
+
+// GET /api/explore/popular - Top resources by transaction count
+router.get('/popular', getPopularResources);
 
 // GET /api/explore/:id - Single resource details + payment info
 router.get('/:id', getPublicResource);
