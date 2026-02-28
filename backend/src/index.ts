@@ -63,6 +63,19 @@ app.listen(PORT, () => {
 
     // Settlement finalization is now handled by the CRE settlement-verifier workflow.
     // startSettlementListener();
+
+    // Keep-alive self-ping to prevent Render free tier from sleeping (every 14 min)
+    const BACKEND_URL = process.env.BACKEND_URL;
+    if (BACKEND_URL) {
+        setInterval(async () => {
+            try {
+                await fetch(`${BACKEND_URL}/health`);
+                console.log('[Keep-alive] Pinged /health');
+            } catch {
+                console.warn('[Keep-alive] Ping failed');
+            }
+        }, 14 * 60 * 1000);
+    }
 });
 
 // Handle shutdown
