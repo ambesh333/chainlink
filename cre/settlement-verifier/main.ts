@@ -150,7 +150,7 @@ const onSettlementRequested = (
         multiHeaders: {
           "Content-Type": { values: ["application/json"] },
         },
-        body: new TextEncoder().encode(notifyPayload),
+        body: { value: notifyPayload, case: "bodyString" as const },
       },
     }).result();
 

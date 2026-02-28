@@ -138,6 +138,32 @@ const onDisputeRaised = (
     `View transaction at https://sepolia.etherscan.io/tx/${finalTxHash}`
   );
 
+  // ─────────────────────────────────────
+  // 4️⃣ Notify backend so DB is updated
+  // ─────────────────────────────────────
+  try {
+    const notifyPayload = JSON.stringify({
+      escrowKey,
+      txHash: finalTxHash,
+      payMerchant,
+    });
+
+    confidentialHttp.sendRequest(runtime, {
+      request: {
+        url: `${config.backendUrl}/cre/dispute-resolved`,
+        method: "POST",
+        multiHeaders: {
+          "Content-Type": { values: ["application/json"] },
+        },
+        body: { value: notifyPayload, case: "bodyString" as const },
+      },
+    }).result();
+
+    runtime.log(`Backend notified: dispute-resolved for ${escrowKey}`);
+  } catch {
+    runtime.log(`Warning: failed to notify backend for ${escrowKey}`);
+  }
+
   return `Resolved ${escrowKey} → payMerchant=${payMerchant} | txHash=${finalTxHash}`;
 };
 

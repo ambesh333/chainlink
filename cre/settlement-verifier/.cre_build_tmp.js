@@ -15233,6 +15233,25 @@ var onSettlementRequested = (runtime2, triggerOutput) => {
   const finalTxHash = bytesToHex(writeReportResult.txHash || new Uint8Array(32));
   runtime2.log(`Write report transaction succeeded: ${finalTxHash}`);
   runtime2.log(`View transaction at https://sepolia.etherscan.io/tx/${finalTxHash}`);
+  try {
+    const notifyPayload = JSON.stringify({
+      escrowKey,
+      txHash: finalTxHash
+    });
+    confidentialHttp.sendRequest(runtime2, {
+      request: {
+        url: `${config.backendUrl}/cre/settlement-complete`,
+        method: "POST",
+        multiHeaders: {
+          "Content-Type": { values: ["application/json"] }
+        },
+        body: { value: notifyPayload, case: "bodyString" }
+      }
+    }).result();
+    runtime2.log(`Backend notified: settlement-complete for ${escrowKey}`);
+  } catch {
+    runtime2.log(`Warning: failed to notify backend for ${escrowKey}`);
+  }
   return `Settled: ${escrowKey} → payMerchant=true | txHash=${finalTxHash}`;
 };
 var initWorkflow = (config) => {

@@ -152,6 +152,58 @@ router.get('/analyze-dispute/:escrowKey', async (req, res) => {
 });
 
 /**
+ * POST /api/cre/dispute-resolved
+ *
+ * Called by the CRE dispute-resolver workflow after finalizing dispute on-chain.
+ * Updates DB: REFUND_REQUESTED → SETTLED (merchant wins) or REFUNDED (agent wins).
+ */
+router.post('/dispute-resolved', async (req, res) => {
+    try {
+        const { escrowKey, txHash, payMerchant } = req.body;
+
+        if (!escrowKey || typeof payMerchant !== 'boolean') {
+            return res.status(400).json({ error: 'escrowKey and payMerchant (boolean) are required' });
+        }
+
+        const transaction = await prisma.transaction.findFirst({
+            where: { paymentTransactionId: escrowKey },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'No transaction found for this escrow key' });
+        }
+
+        if (transaction.status !== 'REFUND_REQUESTED') {
+            return res.json({
+                success: true,
+                message: `Transaction already in state: ${transaction.status}`,
+            });
+        }
+
+        const finalStatus = payMerchant ? 'SETTLED' : 'REFUNDED';
+        const updated = await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+                status: finalStatus,
+                ...(txHash ? { settlementTxHash: txHash } : {}),
+            },
+        });
+
+        console.log(`[CRE] Dispute resolved for escrow=${escrowKey}, payMerchant=${payMerchant}, status=${finalStatus}`);
+
+        return res.json({
+            success: true,
+            transactionId: updated.id,
+            status: updated.status,
+        });
+    } catch (error) {
+        console.error('[CRE] Dispute resolved error:', error);
+        return res.status(500).json({ error: 'Failed to update dispute resolution' });
+    }
+});
+
+/**
  * POST /api/cre/settlement-complete
  *
  * Called by the CRE settlement-verifier workflow after successfully finalizing
