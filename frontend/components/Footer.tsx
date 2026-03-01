@@ -8,7 +8,7 @@ export default function Footer() {
             {/* Banner Image */}
             <div className="w-full">
                 <img
-                    src="/bento/footer-banner.jpg"
+                    src="/bento/footer-banner.png"
                     alt="Bring AI to Chainlink Agent for 1M+ users"
                     className="w-full h-auto object-cover"
                 />

@@ -7,7 +7,6 @@ interface FeatureItem {
     subtitle: string;
     description: string;
     imageSrc?: string;
-    videoSrc?: string;
     imageAlt: string;
 }
 
@@ -16,28 +15,28 @@ const features: FeatureItem[] = [
         title: 'Agent Dashboard',
         subtitle: 'Complete Control',
         description: 'Monitor your escrow balance, track settled sales, and manage active disputes all from one powerful dashboard. Real-time analytics show your top-performing resources and transaction history.',
-        imageSrc: '/landing/merchant.png',
+        imageSrc: '/landing/agent_dashboard.png',
         imageAlt: 'Chainlink Agent Dashboard'
     },
     {
         title: 'Agent Simulation',
         subtitle: 'Test Your Resources',
         description: 'Experience the payment flow from an AI agent\'s perspective. Our terminal-based demo lets you test x402 payment integration, deposit ETH to escrow, and access protected resources—all with Chainlink oracle verification.',
-        videoSrc: '/landing/simulation_demo.mp4',
+        imageSrc: '/landing/simulation_demo.png',
         imageAlt: 'Agent Simulation Terminal'
     },
     {
         title: 'AI Dispute Analyzer',
         subtitle: 'Smart Resolution',
         description: 'When disputes arise, our AI analyzes delivery proof, merchant responses, and context to provide fair decisions. See confidence scores, reasoning, and resolve cases with a single click.',
-        videoSrc: '/landing/Ai_analyser.mp4',
+        imageSrc: '/landing/Ai_analyser.png',
         imageAlt: 'AI Dispute Resolution'
     },
     {
         title: 'Trust Score Algorithm',
         subtitle: 'Build Your Reputation',
         description: 'Every resource and merchant gets a dynamic trust score (0-100). We weight success rates, transaction history, dispute outcomes, and account age—so agents can confidently choose quality resources while new merchants start fair.',
-        imageSrc: '/landing/trustScore.png',
+        imageSrc: '/landing/trust_score.png',
         imageAlt: 'Trust Score System'
     }
 ];
@@ -70,16 +69,7 @@ export default function FeatureShowcase() {
                                 <div className="flex-1 w-full">
                                     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-[#375BD2]/10">
                                         <div className="aspect-video bg-gradient-to-br from-[#1a1a1a] to-[#0d0d0d] relative">
-                                            {feature.videoSrc ? (
-                                                <video
-                                                    src={feature.videoSrc}
-                                                    autoPlay
-                                                    loop
-                                                    muted
-                                                    playsInline
-                                                    className="absolute inset-0 w-full h-full object-cover"
-                                                />
-                                            ) : feature.imageSrc ? (
+                                            {feature.imageSrc ? (
                                                 <Image
                                                     src={feature.imageSrc}
                                                     alt={feature.imageAlt}
