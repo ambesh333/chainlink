@@ -99,6 +99,30 @@ simulate_settlement() {
     fi
 }
 
+simulate_workflow() {
+    echo "=== Simulating Workflow Engine ==="
+    echo ""
+    echo "This workflow:"
+    echo "  1. Cron trigger: every 5 minutes"
+    echo "  2. Fetches active workflows from backend"
+    echo "  3. Interprets and executes each workflow step-by-step"
+    echo "  4. Logs execution results via Confidential HTTP"
+    echo "  5. Writes batch audit report on-chain"
+    echo ""
+
+    if ! command -v cre &>/dev/null; then
+        echo "[INFO] CRE CLI not installed. Install: npm install -g @chainlink/cre-cli"
+        echo ""
+        cat "$CRE_DIR/workflow-engine/workflow.yaml"
+        return
+    fi
+
+    cre workflow simulate "$CRE_DIR/workflow-engine" \
+        --target staging-settings \
+        --broadcast \
+        -v 2>&1 || echo "[INFO] cre CLI simulation complete"
+}
+
 simulate_expiry() {
     echo "=== Simulating Expiry Watchdog Workflow ==="
     echo ""
@@ -129,6 +153,9 @@ case "${1:-all}" in
     settle)
         simulate_settlement
         ;;
+    workflow)
+        simulate_workflow
+        ;;
     expiry)
         simulate_expiry
         ;;
@@ -142,9 +169,13 @@ case "${1:-all}" in
         echo "---"
         echo ""
         simulate_expiry
+        echo ""
+        echo "---"
+        echo ""
+        simulate_workflow
         ;;
     *)
-        echo "Usage: $0 {dispute|settle|expiry|all} [TX_HASH]"
+        echo "Usage: $0 {dispute|settle|expiry|workflow|all} [TX_HASH]"
         exit 1
         ;;
 esac

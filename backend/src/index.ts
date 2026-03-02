@@ -16,6 +16,7 @@ import gatewayRoutes from './routes/gatewayRoutes';
 import exploreRoutes from './routes/exploreRoutes';
 import disputeRoutes from './routes/disputeRoutes';
 import creWebhookRoutes from './routes/creWebhookRoutes';
+import workflowRoutes from './routes/workflowRoutes';
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -51,6 +52,7 @@ app.use('/api/gateway', gatewayRoutes);
 app.use('/api/explore', exploreRoutes);  // Public routes for AI agent discovery
 app.use('/api/disputes', disputeRoutes); // AI dispute resolution
 app.use('/api/cre', creWebhookRoutes);  // CRE workflow webhooks (public, read-only)
+app.use('/api/workflows', workflowRoutes); // Workflow builder CRUD
 
 // Health check
 app.get('/health', (req, res) => {

@@ -421,4 +421,238 @@ router.get('/expired-escrows', async (req, res) => {
     }
 });
 
+// ============= Workflow Engine Endpoints =============
+
+/**
+ * GET /api/cre/active-workflows
+ *
+ * Returns all ACTIVE workflows for the CRE workflow engine to execute.
+ */
+router.get('/active-workflows', async (req, res) => {
+    try {
+        const workflows = await prisma.workflow.findMany({
+            where: { status: 'ACTIVE' },
+            select: {
+                id: true,
+                name: true,
+                definition: true,
+                schedule: true,
+                userId: true,
+                lastRunAt: true,
+                runCount: true,
+            },
+        });
+
+        return res.json({ workflows, count: workflows.length });
+    } catch (error) {
+        console.error('[CRE] Active workflows error:', error);
+        return res.status(500).json({ error: 'Failed to fetch active workflows' });
+    }
+});
+
+/**
+ * GET /api/cre/resource-stats/:resourceId
+ *
+ * Returns access count, earnings, and current price for a resource.
+ * Used by the CRE workflow engine for data fetching blocks.
+ */
+router.get('/resource-stats/:resourceId', async (req, res) => {
+    try {
+        const { resourceId } = req.params;
+
+        const resource = await prisma.resource.findUnique({
+            where: { id: resourceId },
+            select: {
+                id: true,
+                title: true,
+                price: true,
+                isActive: true,
+                type: true,
+            },
+        });
+
+        if (!resource) {
+            return res.status(404).json({ error: 'Resource not found' });
+        }
+
+        const transactions = await prisma.transaction.findMany({
+            where: { resourceId },
+            select: { status: true, amount: true },
+        });
+
+        const accessCount = transactions.length;
+        const settledCount = transactions.filter(t => t.status === 'SETTLED').length;
+        const totalEarnings = transactions
+            .filter(t => t.status === 'SETTLED')
+            .reduce((sum, t) => sum + t.amount, 0);
+        const pendingCount = transactions.filter(t =>
+            t.status === 'PENDING' || t.status === 'SETTLEMENT_REQUESTED'
+        ).length;
+
+        return res.json({
+            resourceId: resource.id,
+            title: resource.title,
+            currentPrice: resource.price,
+            isActive: resource.isActive,
+            type: resource.type,
+            accessCount,
+            settledCount,
+            pendingCount,
+            totalEarnings,
+        });
+    } catch (error) {
+        console.error('[CRE] Resource stats error:', error);
+        return res.status(500).json({ error: 'Failed to fetch resource stats' });
+    }
+});
+
+/**
+ * POST /api/cre/workflow-action
+ *
+ * Executes an action on behalf of the workflow engine.
+ * Actions: update_price, toggle_resource
+ */
+router.post('/workflow-action', async (req, res) => {
+    try {
+        const { action, resourceId, value } = req.body;
+
+        if (!action || !resourceId) {
+            return res.status(400).json({ error: 'action and resourceId are required' });
+        }
+
+        const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
+        if (!resource) {
+            return res.status(404).json({ error: 'Resource not found' });
+        }
+
+        let result: any;
+
+        switch (action) {
+            case 'update_price': {
+                if (typeof value !== 'number' || value < 0) {
+                    return res.status(400).json({ error: 'value must be a non-negative number' });
+                }
+                const oldPrice = resource.price;
+                const updated = await prisma.resource.update({
+                    where: { id: resourceId },
+                    data: { price: value },
+                });
+                result = {
+                    action: 'update_price',
+                    resourceId,
+                    oldPrice,
+                    newPrice: updated.price,
+                    title: updated.title,
+                };
+                console.log(`[CRE] Price updated: ${updated.title} ${oldPrice} → ${updated.price}`);
+                break;
+            }
+
+            case 'toggle_resource': {
+                const updated = await prisma.resource.update({
+                    where: { id: resourceId },
+                    data: { isActive: typeof value === 'boolean' ? value : !resource.isActive },
+                });
+                result = {
+                    action: 'toggle_resource',
+                    resourceId,
+                    isActive: updated.isActive,
+                    title: updated.title,
+                };
+                console.log(`[CRE] Resource toggled: ${updated.title} → ${updated.isActive ? 'active' : 'inactive'}`);
+                break;
+            }
+
+            default:
+                return res.status(400).json({ error: `Unknown action: ${action}` });
+        }
+
+        return res.json({ success: true, result });
+    } catch (error) {
+        console.error('[CRE] Workflow action error:', error);
+        return res.status(500).json({ error: 'Failed to execute workflow action' });
+    }
+});
+
+/**
+ * POST /api/cre/workflow-execution
+ *
+ * Logs workflow execution result from the CRE engine.
+ */
+router.post('/workflow-execution', async (req, res) => {
+    try {
+        const { workflowId, status, log, result, txHash } = req.body;
+
+        if (!workflowId || !status) {
+            return res.status(400).json({ error: 'workflowId and status are required' });
+        }
+
+        const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Create execution record
+        const execution = await prisma.workflowExecution.create({
+            data: {
+                workflowId,
+                status,
+                log: log || null,
+                result: result || null,
+                txHash: txHash || null,
+                completedAt: status !== 'running' ? new Date() : null,
+            },
+        });
+
+        // Update workflow metadata
+        await prisma.workflow.update({
+            where: { id: workflowId },
+            data: {
+                lastRunAt: new Date(),
+                lastRunLog: log || null,
+                runCount: { increment: 1 },
+            },
+        });
+
+        console.log(`[CRE] Workflow execution logged: ${workflowId} → ${status}`);
+
+        return res.json({ success: true, executionId: execution.id });
+    } catch (error) {
+        console.error('[CRE] Workflow execution error:', error);
+        return res.status(500).json({ error: 'Failed to log workflow execution' });
+    }
+});
+
+/**
+ * POST /api/cre/ai-price-analysis
+ *
+ * AI-powered price analysis for a resource based on demand metrics.
+ * Used by the CRE workflow engine for AI analysis blocks.
+ */
+router.post('/ai-price-analysis', async (req, res) => {
+    try {
+        const { resourceId, currentPrice, accessCount, totalEarnings, settledCount } = req.body;
+
+        if (!resourceId) {
+            return res.status(400).json({ error: 'resourceId is required' });
+        }
+
+        // Lazy import to avoid circular dependency issues
+        const { analyzePricing } = await import('../services/aiPricingService');
+
+        const analysis = await analyzePricing({
+            resourceId,
+            currentPrice: currentPrice || 0,
+            accessCount: accessCount || 0,
+            totalEarnings: totalEarnings || 0,
+            settledCount: settledCount || 0,
+        });
+
+        return res.json(analysis);
+    } catch (error: any) {
+        console.error('[CRE] AI price analysis error:', error);
+        return res.status(500).json({ error: 'AI analysis failed', message: error.message });
+    }
+});
+
 export default router;

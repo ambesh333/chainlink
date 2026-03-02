@@ -39,6 +39,7 @@ model User {
   updatedAt       DateTime      @updatedAt
   resources       Resource[]
   transactions    Transaction[]
+  workflows       Workflow[]
 }
 
 // AuthChallenge: Short-lived nonces for SIWE (Sign-In With Ethereum)
@@ -73,6 +74,48 @@ model Resource {
   transactions        Transaction[]
 
   @@index([userId])
+}
+
+enum WorkflowStatus {
+  ACTIVE
+  PAUSED
+  DRAFT
+}
+
+// Workflow: Automation workflow definitions
+model Workflow {
+  id          String              @id @default(uuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id])
+  name        String
+  description String?
+  status      WorkflowStatus      @default(DRAFT)
+  definition  Json                // React Flow nodes + edges
+  schedule    String?             // Cron expression
+  lastRunAt   DateTime?
+  lastRunLog  String?             @db.Text
+  runCount    Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  executions  WorkflowExecution[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// WorkflowExecution: Execution history for workflows
+model WorkflowExecution {
+  id          String    @id @default(uuid())
+  workflowId  String
+  workflow    Workflow   @relation(fields: [workflowId], references: [id])
+  status      String    // "running", "completed", "failed"
+  log         String?   @db.Text
+  result      Json?
+  txHash      String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([workflowId])
 }
 
 // Transaction: Escrow records for x402 payments

@@ -7,6 +7,7 @@
     "simulate:dispute": "./scripts/simulate.sh dispute",
     "simulate:settle": "./scripts/simulate.sh settle",
     "simulate:expiry": "./scripts/simulate.sh expiry",
+    "simulate:workflow": "./scripts/simulate.sh workflow",
     "simulate:all": "./scripts/simulate.sh all"
   },
   "license": "UNLICENSED",
