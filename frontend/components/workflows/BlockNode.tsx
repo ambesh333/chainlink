@@ -1,7 +1,7 @@
 'use client';
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Clock, Database, Brain, GitBranch, Zap, PlayCircle, StopCircle } from 'lucide-react';
+import { Clock, Database, Brain, GitBranch, Zap, PlayCircle, StopCircle, Send } from 'lucide-react';
 
 export interface BlockNodeData {
     blockType: string;
@@ -21,6 +21,7 @@ const typeConfig: Record<string, { color: string; bg: string; border: string; ic
 const blockTypeIcons: Record<string, React.ElementType> = {
     start: PlayCircle,
     stop: StopCircle,
+    telegram_notify: Send,
 };
 
 function BlockNodeComponent({ data, type, selected }: NodeProps) {
@@ -82,6 +83,9 @@ function BlockNodeComponent({ data, type, selected }: NodeProps) {
                     )}
                     {nodeData.blockType === 'update_price' && nodeData.config.mode && (
                         <span>Mode: {nodeData.config.mode}</span>
+                    )}
+                    {nodeData.blockType === 'telegram_notify' && nodeData.config.chatId && (
+                        <span>Chat: {nodeData.config.chatId}</span>
                     )}
                 </div>
             )}

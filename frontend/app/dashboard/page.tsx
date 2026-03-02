@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Package, TrendingUp, Zap, Shield, Loader2, Wallet, CheckCircle, Clock, Image, Video, ExternalLink, Bot, ArrowLeft, ArrowUpRight, Link2, ArrowDownLeft, ArrowUpFromLine, AlertTriangle } from 'lucide-react';
+import { Package, TrendingUp, Zap, Shield, Loader2, Wallet, CheckCircle, Clock, Image, Video, ExternalLink, Bot, ArrowLeft, ArrowUpRight, Link2, ArrowDownLeft, ArrowUpFromLine, AlertTriangle, Activity } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
 import { getApiUrl } from '@/lib/config';
 
@@ -88,6 +88,14 @@ export default function DashboardPage() {
     const [disputesLoading, setDisputesLoading] = useState(true);
     const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
     const [activeTab, setActiveTab] = useState<TabKey>('transactions');
+    const [visible, setVisible] = useState(false);
+
+    // Trigger animations once data is loaded
+    useEffect(() => {
+        if (!loading) {
+            requestAnimationFrame(() => setVisible(true));
+        }
+    }, [loading]);
 
     const getHeaders = () => {
         const token = getToken();
@@ -416,103 +424,208 @@ export default function DashboardPage() {
     ];
 
     return (
-        <div>
+        <div className="relative">
+            {/* Ambient glow */}
+            <div className="absolute -top-32 left-1/4 w-96 h-96 bg-[#375BD2]/5 rounded-full blur-[150px] animate-pulse-glow pointer-events-none" />
+            <div className="absolute -top-20 right-1/4 w-72 h-72 bg-[#4C8BF5]/4 rounded-full blur-[120px] animate-pulse-glow pointer-events-none" style={{ animationDelay: '1.5s' }} />
+
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10 bg-gradient-to-br from-[#0a0a0f] to-[#0d1230]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Total Resources</h3>
-                        <Package size={16} className="text-[#375BD2]" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                {/* Total Resources */}
+                <div
+                    className={`feature-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-6 ${visible ? 'animate-fade-up' : 'opacity-0'}`}
+                    style={{ animationDelay: '0.1s' }}
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#375BD2]/5 rounded-full blur-[60px] group-hover:bg-[#375BD2]/10 transition-colors duration-500 pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">Total Resources</h3>
+                            <div className="w-8 h-8 rounded-lg bg-[#375BD2]/10 flex items-center justify-center group-hover:bg-[#375BD2]/20 group-hover:scale-110 transition-all duration-300">
+                                <Package size={14} className="text-[#375BD2]" />
+                            </div>
+                        </div>
+                        <div className="flex items-baseline gap-2 mb-4">
+                            <span className="text-4xl font-mono font-bold text-white group-hover:text-[#375BD2] transition-colors duration-300">{totalResources}</span>
+                            <span className="text-sm text-gray-500">registered</span>
+                        </div>
+                        <div className="flex items-end gap-[3px] h-9">
+                            {Array.from({ length: 28 }).map((_, i) => {
+                                const filled = i < Math.min(28, Math.round((activeResources / Math.max(totalResources, 1)) * 28));
+                                const intensity = filled ? 0.4 + (i / 28) * 0.6 : 0.08;
+                                return (
+                                    <div
+                                        key={i}
+                                        className="flex-1 rounded-[2px] transition-all duration-500"
+                                        style={{
+                                            height: `${35 + Math.sin(i * 0.45) * 20 + (filled ? 45 : 0)}%`,
+                                            background: filled
+                                                ? `rgba(55, 91, 210, ${intensity})`
+                                                : 'rgba(255,255,255,0.04)',
+                                            transitionDelay: `${i * 20}ms`,
+                                        }}
+                                    />
+                                );
+                            })}
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-3">
+                            {activePercent}% active{' '}
+                            <span className="text-gray-700">•</span>{' '}
+                            {activeResources} / {totalResources} resources
+                        </p>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#375BD2]">{totalResources}</span>
-                        <span className="text-sm text-gray-400">registered</span>
-                    </div>
-                    <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-[#375BD2] h-full" style={{ width: `${Math.min(100, totalResources * 10)}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">Data assets in your portfolio</p>
                 </div>
 
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10 bg-gradient-to-br from-[#0a0a0f] to-[#0d1230]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Active Resources</h3>
-                        <Zap size={16} className="text-[#4CAF50]" />
+                {/* Active Resources */}
+                <div
+                    className={`feature-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-6 ${visible ? 'animate-fade-up' : 'opacity-0'}`}
+                    style={{ animationDelay: '0.2s' }}
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/5 rounded-full blur-[60px] group-hover:bg-[#10B981]/10 transition-colors duration-500 pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">Active Resources</h3>
+                            <div className="w-8 h-8 rounded-lg bg-[#10B981]/10 flex items-center justify-center group-hover:bg-[#10B981]/20 group-hover:scale-110 transition-all duration-300">
+                                <Zap size={14} className="text-[#10B981]" />
+                            </div>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-mono font-bold text-white group-hover:text-[#10B981] transition-colors duration-300">{activeResources}</span>
+                            <span className="text-sm text-gray-500">live</span>
+                        </div>
+                        {/* Segmented progress */}
+                        <div className="flex gap-1 mt-5">
+                            {Array.from({ length: 12 }).map((_, i) => {
+                                const isFilled = i < Math.round((activePercent / 100) * 12);
+                                return (
+                                    <div
+                                        key={i}
+                                        className="flex-1 h-2 rounded-full transition-all duration-500"
+                                        style={{
+                                            background: isFilled
+                                                ? `rgba(16, 185, 129, ${0.3 + (i / 12) * 0.7})`
+                                                : 'rgba(255,255,255,0.04)',
+                                            transitionDelay: `${i * 40}ms`,
+                                        }}
+                                    />
+                                );
+                            })}
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-3">Currently available on the network</p>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#4CAF50]">{activeResources}</span>
-                        <span className="text-sm text-gray-400">live</span>
-                    </div>
-                    <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-[#4CAF50] h-full" style={{ width: `${activePercent}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">Currently available on the network</p>
                 </div>
 
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10 bg-gradient-to-br from-[#0a0a0f] to-[#0d1230]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Trust Score</h3>
-                        <Shield size={16} className="text-[#4C8BF5]" />
+                {/* Trust Score */}
+                <div
+                    className={`feature-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-6 ${visible ? 'animate-fade-up' : 'opacity-0'}`}
+                    style={{ animationDelay: '0.3s' }}
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#4C8BF5]/5 rounded-full blur-[60px] group-hover:bg-[#4C8BF5]/10 transition-colors duration-500 pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">Trust Score</h3>
+                            <div className="w-8 h-8 rounded-lg bg-[#4C8BF5]/10 flex items-center justify-center group-hover:bg-[#4C8BF5]/20 group-hover:scale-110 transition-all duration-300">
+                                <Shield size={14} className="text-[#4C8BF5]" />
+                            </div>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-mono font-bold text-white group-hover:text-[#4C8BF5] transition-colors duration-300">{trustScore}</span>
+                            <span className="text-sm text-gray-500">/ 100</span>
+                        </div>
+                        {/* Arc-style progress */}
+                        <div className="relative mt-5 h-2 rounded-full overflow-hidden bg-white/[0.04]">
+                            <div
+                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
+                                style={{
+                                    width: `${trustScore}%`,
+                                    background: 'linear-gradient(90deg, #375BD2, #4C8BF5, #7C3AED)',
+                                    boxShadow: '0 0 12px rgba(76, 139, 245, 0.4)',
+                                }}
+                            />
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-3">{trustLabel}</p>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-mono font-bold text-[#4C8BF5]">{trustScore}</span>
-                        <span className="text-sm text-gray-400">/ 100</span>
-                    </div>
-                    <div className="w-full bg-white/10 h-1.5 mt-4 rounded-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-[#375BD2] to-[#4C8BF5] h-full" style={{ width: `${trustScore}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">{trustLabel}</p>
                 </div>
             </div>
 
             {/* Second Row Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
-                    <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Total Transactions</h3>
-                    <span className="text-3xl font-mono font-bold text-white">{totalTransactions}</span>
-                    <p className="text-xs text-gray-500 mt-2">All-time completed purchases</p>
-                </div>
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Awaiting Settlement</h3>
-                        <Clock size={14} className="text-[#375BD2]" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                {[
+                    {
+                        label: 'Total Transactions',
+                        value: <span className="text-white">{totalTransactions}</span>,
+                        sub: 'All-time completed purchases',
+                        icon: <Activity size={13} />,
+                        color: '#ffffff',
+                        delay: '0.4s',
+                    },
+                    {
+                        label: 'Awaiting Settlement',
+                        value: <><span className="text-[#375BD2]">{(totalPending + totalSettlementRequested).toFixed(5)}</span> <span className="text-lg text-gray-600">ETH</span></>,
+                        sub: 'Pending + awaiting CRE workflow',
+                        icon: <Clock size={13} />,
+                        color: '#375BD2',
+                        delay: '0.5s',
+                    },
+                    {
+                        label: 'Settled',
+                        value: <><span className="text-[#10B981]">{totalSettled.toFixed(5)}</span> <span className="text-lg text-gray-600">ETH</span></>,
+                        sub: 'Successfully settled to your wallet',
+                        icon: <CheckCircle size={13} />,
+                        color: '#10B981',
+                        delay: '0.6s',
+                    },
+                    {
+                        label: 'Pending Disputes',
+                        value: <span className="text-yellow-400">{pendingDisputes}</span>,
+                        sub: 'Awaiting AI resolution',
+                        icon: <AlertTriangle size={13} />,
+                        color: '#EAB308',
+                        delay: '0.7s',
+                    },
+                ].map((card) => (
+                    <div
+                        key={card.label}
+                        className={`feature-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-5 ${visible ? 'animate-fade-up' : 'opacity-0'}`}
+                        style={{ animationDelay: card.delay }}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">{card.label}</h3>
+                            <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center group-hover:scale-110 transition-all duration-300"
+                                style={{ background: `${card.color}10`, color: card.color }}
+                            >
+                                {card.icon}
+                            </div>
+                        </div>
+                        <div className="text-2xl font-mono font-bold">{card.value}</div>
+                        <p className="text-[11px] text-gray-600 mt-2">{card.sub}</p>
                     </div>
-                    <span className="text-3xl font-mono font-bold text-[#375BD2]">{(totalPending + totalSettlementRequested).toFixed(5)} <span className="text-lg text-gray-500">ETH</span></span>
-                    <p className="text-xs text-gray-500 mt-2">Pending + awaiting CRE workflow</p>
-                </div>
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider">Settled</h3>
-                        <CheckCircle size={14} className="text-green-400" />
-                    </div>
-                    <span className="text-3xl font-mono font-bold text-green-400">{totalSettled.toFixed(5)} <span className="text-lg text-gray-500">ETH</span></span>
-                    <p className="text-xs text-gray-500 mt-2">Successfully settled to your wallet</p>
-                </div>
-                <div className="bg-[#0a0a0f] p-6 rounded-xl border border-white/10">
-                    <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Pending Disputes</h3>
-                    <span className="text-3xl font-mono font-bold text-yellow-400">{pendingDisputes}</span>
-                    <p className="text-xs text-gray-500 mt-2">Awaiting AI resolution</p>
-                </div>
+                ))}
             </div>
 
             {/* Tabbed Section */}
-            <div className="bg-[#0a0a0f] rounded-2xl border border-white/5 overflow-hidden">
+            <div
+                className={`rounded-2xl border border-white/[0.06] bg-white/[0.01] backdrop-blur-sm overflow-hidden ${visible ? 'animate-fade-up' : 'opacity-0'}`}
+                style={{ animationDelay: '0.8s' }}
+            >
                 {/* Tab Bar */}
-                <div className="flex border-b border-white/5">
+                <div className="flex border-b border-white/[0.06]">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors relative ${
+                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-all duration-300 relative ${
                                 activeTab === tab.key
                                     ? 'text-white'
                                     : 'text-gray-500 hover:text-gray-300'
                             }`}
                         >
-                            {tab.icon}
+                            <span className={`transition-transform duration-300 ${activeTab === tab.key ? 'scale-110' : ''}`}>
+                                {tab.icon}
+                            </span>
                             {tab.label}
                             {tab.count !== undefined && tab.count > 0 && (
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full transition-all duration-300 ${
                                     activeTab === tab.key
                                         ? 'bg-[#375BD2]/20 text-[#375BD2]'
                                         : 'bg-white/5 text-gray-500'
@@ -521,7 +634,7 @@ export default function DashboardPage() {
                                 </span>
                             )}
                             {activeTab === tab.key && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#375BD2]" />
+                                <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-gradient-to-r from-[#375BD2] to-[#4C8BF5]" />
                             )}
                         </button>
                     ))}

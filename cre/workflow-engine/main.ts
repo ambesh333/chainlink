@@ -303,6 +303,38 @@ function executeNode(
         }
       }
 
+      if (blockType === "telegram_notify") {
+        const chatId = nodeConfig.chatId;
+        if (!chatId) {
+          runtime.log(`  Telegram: No chatId configured`);
+          return { success: false, output: { error: "No chatId configured" } };
+        }
+
+        // Interpolate template variables in message
+        let message = nodeConfig.message || "";
+        message = message.replace(/\{\{(\w+)\}\}/g, (_: string, key: string) => {
+          const value = context[key];
+          return value !== undefined ? String(value) : `{{${key}}}`;
+        });
+
+        try {
+          const result = httpPost(runtime, http, `${config.backendUrl}/cre/workflow-action`, {
+            action: "telegram_notify",
+            resourceId: context.resourceId || "",
+            chatId,
+            message,
+            botToken: nodeConfig.botToken || undefined,
+            context,
+          });
+
+          runtime.log(`  Action: Telegram notify → chatId=${chatId}, ok=${result?.result?.messageSent}`);
+          return { success: true, output: result };
+        } catch (e: any) {
+          runtime.log(`  Telegram notify failed: ${e.message || "unknown"}`);
+          return { success: false, output: { error: e.message || "telegram_notify failed" } };
+        }
+      }
+
       return { success: false, output: { error: `Unknown action block: ${blockType}` } };
     }
 

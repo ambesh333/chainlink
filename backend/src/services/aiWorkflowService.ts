@@ -63,6 +63,7 @@ AVAILABLE BLOCK TYPES:
 6. ACTION blocks (type: "action"):
    - "update_price": Update resource price. config: { mode: "ai_recommended"|"fixed"|"percentage", value?: number }
    - "toggle_resource": Enable/disable resource. config: { active: boolean }
+   - "telegram_notify": Send Telegram message. config: { chatId: "string", message: "string with {{currentPrice}}, {{accessCount}}, {{totalEarnings}}, {{settledCount}} template vars", botToken?: "optional" }
 
 NODE ID RULES:
 - Start block: "node_start"
@@ -141,10 +142,64 @@ Start → Cron → Fetch Stats → Compare (totalEarnings > 0.5) → Toggle Reso
   "schedule": "*/5 * * * *"
 }
 
+EXAMPLE 3: "Reduce price by 10% when demand is low (access count < 5)"
+Start → Cron → Fetch Stats → Compare (accessCount < 5) → Update Price (percentage, -10) → Stop
+
+{
+  "nodes": [
+    {"id":"node_start","type":"trigger","position":{"x":400,"y":50},"data":{"blockType":"start","label":"Start","config":{}}},
+    {"id":"node_100","type":"trigger","position":{"x":400,"y":170},"data":{"blockType":"cron","label":"Cron Schedule","config":{"schedule":"*/5 * * * *"}}},
+    {"id":"node_101","type":"data","position":{"x":400,"y":290},"data":{"blockType":"fetch_stats","label":"Fetch Stats","config":{"resourceId":"RESOURCE_ID"}}},
+    {"id":"node_102","type":"condition","position":{"x":400,"y":410},"data":{"blockType":"compare","label":"Low Demand?","config":{"metric":"accessCount","operator":"<","value":5}}},
+    {"id":"node_103","type":"action","position":{"x":400,"y":530},"data":{"blockType":"update_price","label":"Discount 10%","config":{"mode":"percentage","value":-10}}},
+    {"id":"node_stop","type":"action","position":{"x":400,"y":650},"data":{"blockType":"stop","label":"Stop","config":{}}}
+  ],
+  "edges": [
+    {"id":"edge_node_start_node_100","source":"node_start","target":"node_100","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_100_node_101","source":"node_100","target":"node_101","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_101_node_102","source":"node_101","target":"node_102","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_102_node_103","source":"node_102","target":"node_103","sourceHandle":"true","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_103_node_stop","source":"node_103","target":"node_stop","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_102_node_stop","source":"node_102","target":"node_stop","sourceHandle":"false","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}}
+  ],
+  "name": "Discount on Low Demand",
+  "description": "Reduces price by 10% when access count is below 5",
+  "schedule": "*/5 * * * *"
+}
+
+EXAMPLE 4: "Pause resource when settled count is less than 2"
+Start → Cron → Fetch Stats → Compare (settledCount < 2) → Toggle Resource (false) → Stop
+
+{
+  "nodes": [
+    {"id":"node_start","type":"trigger","position":{"x":400,"y":50},"data":{"blockType":"start","label":"Start","config":{}}},
+    {"id":"node_100","type":"trigger","position":{"x":400,"y":170},"data":{"blockType":"cron","label":"Cron Schedule","config":{"schedule":"*/5 * * * *"}}},
+    {"id":"node_101","type":"data","position":{"x":400,"y":290},"data":{"blockType":"fetch_stats","label":"Fetch Stats","config":{"resourceId":"RESOURCE_ID"}}},
+    {"id":"node_102","type":"condition","position":{"x":400,"y":410},"data":{"blockType":"compare","label":"Low Settlements?","config":{"metric":"settledCount","operator":"<","value":2}}},
+    {"id":"node_103","type":"action","position":{"x":400,"y":530},"data":{"blockType":"toggle_resource","label":"Pause Resource","config":{"active":false}}},
+    {"id":"node_stop","type":"action","position":{"x":400,"y":650},"data":{"blockType":"stop","label":"Stop","config":{}}}
+  ],
+  "edges": [
+    {"id":"edge_node_start_node_100","source":"node_start","target":"node_100","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_100_node_101","source":"node_100","target":"node_101","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_101_node_102","source":"node_101","target":"node_102","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_102_node_103","source":"node_102","target":"node_103","sourceHandle":"true","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_103_node_stop","source":"node_103","target":"node_stop","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}},
+    {"id":"edge_node_102_node_stop","source":"node_102","target":"node_stop","sourceHandle":"false","animated":true,"style":{"stroke":"#ffffff20","strokeWidth":2}}
+  ],
+  "name": "Settlement Monitor",
+  "description": "Pauses resource when settled transaction count is below 2",
+  "schedule": "*/5 * * * *"
+}
+
 ===== END EXAMPLES =====
 
 For any request involving AI price analysis or AI-powered pricing, ALWAYS use the EXAMPLE 1 pattern:
 Start → Cron → Fetch Stats → Price Analysis → Compare → Update Price (mode: ai_recommended) → Stop
+
+For requests involving low demand or discount pricing, use the EXAMPLE 3 pattern.
+For requests involving settlement monitoring or pausing resources, use the EXAMPLE 4 pattern.
+For requests mentioning Telegram or notifications, add a telegram_notify action block with config: { chatId: "USER_CHAT_ID", message: "template with {{variables}}" }.
 
 Replace RESOURCE_ID with the actual resource ID from the provided list.
 

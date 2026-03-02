@@ -33,6 +33,7 @@ const blockDescriptions: Record<string, string> = {
     price_analysis: 'Sends resource metrics to an AI model (Gemini/GPT/Claude) which analyzes demand patterns and recommends an optimal price.',
     update_price: 'Updates the resource price on the marketplace. Can use AI-recommended price, a fixed value, or a percentage change.',
     toggle_resource: 'Enables or disables a resource on the marketplace, controlling its visibility and purchasability.',
+    telegram_notify: 'Sends a notification message via Telegram Bot API. Use template variables like {{currentPrice}}, {{accessCount}}, {{totalEarnings}}, {{settledCount}} in the message.',
     start: 'Marks the beginning of the workflow. Every workflow must have a start block as its entry point.',
     stop: 'Marks the end of the workflow. Signals that execution is complete for this branch.',
 };
@@ -299,6 +300,41 @@ export default function BlockConfigPanel({ node, resources, onUpdate, onClose, o
                             <option value="true">Enable</option>
                             <option value="false">Disable</option>
                         </select>
+                    </div>
+                </>
+            )}
+
+            {data.blockType === 'telegram_notify' && (
+                <>
+                    <div className="mb-3">
+                        <FieldLabel label="Bot Token (optional)" tooltip="Your Telegram bot token from @BotFather. Leave empty to use the server's default TELEGRAM_BOT_TOKEN environment variable." />
+                        <input
+                            type="text"
+                            value={config.botToken || ''}
+                            onChange={(e) => updateConfig('botToken', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-[#375BD2] focus:outline-none"
+                            placeholder="Falls back to env var"
+                        />
+                    </div>
+                    <div className="mb-3">
+                        <FieldLabel label="Chat ID" tooltip="The Telegram chat ID to send messages to. Get it from https://api.telegram.org/bot<TOKEN>/getUpdates after messaging your bot." />
+                        <input
+                            type="text"
+                            value={config.chatId || ''}
+                            onChange={(e) => updateConfig('chatId', e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-[#375BD2] focus:outline-none"
+                            placeholder="e.g. 123456789"
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <FieldLabel label="Message" tooltip="Message template. Use {{currentPrice}}, {{accessCount}}, {{totalEarnings}}, {{settledCount}} for dynamic values." />
+                        <textarea
+                            value={config.message || ''}
+                            onChange={(e) => updateConfig('message', e.target.value)}
+                            rows={3}
+                            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-[#375BD2] focus:outline-none resize-none"
+                            placeholder="Price is {{currentPrice}} ETH with {{accessCount}} accesses"
+                        />
                     </div>
                 </>
             )}

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { Home, Twitter, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Home, Twitter, ChevronRight, Zap, Shield, Bot, ArrowRight, Sparkles, Lock, Workflow } from 'lucide-react';
 
 const sections = [
     { id: 'overview', title: 'Overview' },
@@ -17,6 +17,19 @@ const sections = [
 
 export default function DocumentationPage() {
     const [activeSection, setActiveSection] = useState('overview');
+    const [overviewVisible, setOverviewVisible] = useState(false);
+    const overviewRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        const el = overviewRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) setOverviewVisible(true); },
+            { threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -80,35 +93,141 @@ export default function DocumentationPage() {
                         </div>
 
                         {/* 1. Overview */}
-                        <section id="overview" className="mb-20">
-                            <h1 className="text-4xl font-bold mb-6">
-                                Chainlink <span className="text-[#375BD2]">Agent</span> Documentation
-                            </h1>
-                            <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                                Chainlink Agent is a decentralized marketplace where AI agents and humans can purchase data resources from merchants using trustless, escrow-backed payments on Ethereum Sepolia. Every transaction is secured by on-chain escrow, and the entire settlement and dispute lifecycle is automated by <span className="text-[#375BD2] font-semibold">Chainlink CRE (Compute Runtime Environment)</span> workflows.
-                            </p>
-                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
-                                <h3 className="text-xl font-semibold text-white mb-4">Key Features</h3>
-                                <ul className="space-y-4 text-gray-400">
-                                    {[
-                                        ['x402 Payment Protocol', 'Native HTTP 402 flow lets AI agents discover, pay for, and access resources programmatically.'],
-                                        ['On-Chain Escrow', 'ETH and ERC-20 funds are held in a smart contract until delivery is verified or disputes are resolved.'],
-                                        ['Automated Settlement', 'CRE workflows verify delivery, resolve disputes with AI analysis, and handle expired escrows automatically.'],
-                                        ['AI Dispute Resolution', 'When buyers raise disputes, an AI model analyzes the resource and description to produce a fair verdict.'],
-                                    ].map(([title, desc]) => (
-                                        <li key={title} className="flex items-start gap-3">
-                                            <span className="text-[#375BD2] mt-1">•</span>
-                                            <span><strong className="text-white">{title}:</strong> {desc}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                        <section id="overview" className="mb-20 relative" ref={overviewRef}>
+                            {/* Ambient glow orbs */}
+                            <div className="absolute -top-20 -left-20 w-72 h-72 bg-[#375BD2]/10 rounded-full blur-[120px] animate-pulse-glow pointer-events-none" />
+                            <div className="absolute -top-10 right-0 w-56 h-56 bg-[#4C8BF5]/8 rounded-full blur-[100px] animate-pulse-glow pointer-events-none" style={{ animationDelay: '1.5s' }} />
+
+                            {/* Badge */}
+                            <div
+                                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#375BD2]/20 bg-[#375BD2]/5 mb-6 ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                style={{ animationDelay: '0.1s' }}
+                            >
+                                <Sparkles size={12} className="text-[#4C8BF5]" />
+                                <span className="text-xs font-medium text-[#4C8BF5] tracking-wide">Decentralized Data Marketplace</span>
                             </div>
-                            <div className="flex gap-4">
-                                <Link href="/dashboard" className="px-6 py-3 bg-[#375BD2] hover:bg-[#2A4AB0] text-white font-medium rounded-xl transition-colors">
+
+                            {/* Title */}
+                            <h1
+                                className={`text-5xl font-bold mb-4 leading-tight ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                style={{ animationDelay: '0.2s' }}
+                            >
+                                Chainlink{' '}
+                                <span className="relative">
+                                    <span className="bg-gradient-to-r from-[#375BD2] via-[#4C8BF5] to-[#375BD2] bg-clip-text text-transparent animate-shimmer bg-[length:200%_auto]">
+                                        Agent
+                                    </span>
+                                </span>
+                                <br />
+                                <span className="text-gray-400 text-4xl font-medium">Documentation</span>
+                            </h1>
+
+                            {/* Description */}
+                            <p
+                                className={`text-gray-400 text-lg leading-relaxed mb-10 max-w-2xl ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                style={{ animationDelay: '0.35s' }}
+                            >
+                                A trustless marketplace where AI agents and humans purchase data resources with{' '}
+                                <span className="text-white/80 font-medium">escrow-backed payments</span> on Ethereum Sepolia.
+                                Settlement, disputes, and expiry are fully automated by{' '}
+                                <span className="text-[#375BD2] font-semibold">Chainlink CRE</span> workflows.
+                            </p>
+
+                            {/* Feature Cards — Pinterest-style staggered grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+                                {[
+                                    {
+                                        icon: <Zap size={20} />,
+                                        title: 'x402 Payment Protocol',
+                                        desc: 'Native HTTP 402 flow lets AI agents discover, pay for, and access resources programmatically.',
+                                        color: '#375BD2',
+                                        delay: '0.4s',
+                                    },
+                                    {
+                                        icon: <Lock size={20} />,
+                                        title: 'On-Chain Escrow',
+                                        desc: 'ETH and ERC-20 funds are held in a smart contract until delivery is verified or disputes are resolved.',
+                                        color: '#4C8BF5',
+                                        delay: '0.5s',
+                                    },
+                                    {
+                                        icon: <Workflow size={20} />,
+                                        title: 'Automated Settlement',
+                                        desc: 'CRE workflows verify delivery, resolve disputes with AI analysis, and handle expired escrows automatically.',
+                                        color: '#10B981',
+                                        delay: '0.6s',
+                                    },
+                                    {
+                                        icon: <Bot size={20} />,
+                                        title: 'AI Dispute Resolution',
+                                        desc: 'When buyers raise disputes, an AI model analyzes the resource and description to produce a fair verdict.',
+                                        color: '#7C3AED',
+                                        delay: '0.7s',
+                                    },
+                                ].map((feature) => (
+                                    <div
+                                        key={feature.title}
+                                        className={`feature-card group rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] p-5 cursor-default ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                        style={{ animationDelay: feature.delay }}
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div
+                                                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110"
+                                                style={{ background: `${feature.color}15`, color: feature.color }}
+                                            >
+                                                {feature.icon}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-semibold text-sm mb-1.5 group-hover:text-[#4C8BF5] transition-colors duration-300">
+                                                    {feature.title}
+                                                </h4>
+                                                <p className="text-gray-500 text-[13px] leading-relaxed">
+                                                    {feature.desc}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Stats row */}
+                            <div
+                                className={`flex items-center gap-8 mb-10 ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                style={{ animationDelay: '0.8s' }}
+                            >
+                                {[
+                                    { value: 'x402', label: 'Protocol' },
+                                    { value: '3', label: 'CRE Workflows' },
+                                    { value: 'ETH', label: '& ERC-20' },
+                                    { value: 'AI', label: 'Dispute Engine' },
+                                ].map((stat) => (
+                                    <div key={stat.label} className="group cursor-default">
+                                        <div className="text-xl font-bold text-white group-hover:text-[#375BD2] transition-colors duration-300">
+                                            {stat.value}
+                                        </div>
+                                        <div className="text-xs text-gray-600 mt-0.5">{stat.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* CTA Buttons */}
+                            <div
+                                className={`flex items-center gap-4 ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
+                                style={{ animationDelay: '0.9s' }}
+                            >
+                                <Link
+                                    href="/dashboard"
+                                    className="group relative inline-flex items-center gap-2 px-7 py-3.5 bg-[#375BD2] hover:bg-[#2A4AB0] text-white font-medium rounded-xl transition-all duration-300 hover:shadow-[0_8px_30px_-6px_rgba(55,91,210,0.4)]"
+                                >
                                     Get Started
+                                    <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" />
                                 </Link>
-                                <Link href="/dashboard/demo" className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors">
+                                <Link
+                                    href="/dashboard/demo"
+                                    className="group inline-flex items-center gap-2 px-7 py-3.5 bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 hover:text-white font-medium rounded-xl border border-white/[0.08] hover:border-white/[0.15] transition-all duration-300"
+                                >
                                     Try Demo
+                                    <Sparkles size={14} className="text-gray-500 group-hover:text-[#4C8BF5] transition-colors duration-300" />
                                 </Link>
                             </div>
                         </section>

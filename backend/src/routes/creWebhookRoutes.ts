@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { prisma } from '../context';
 import { getEscrowOnChain, EscrowState } from '../clients/escrowClient';
 import { analyzeDispute, AnalysisInput } from '../services/aiDisputeService';
+import { sendTelegramMessage, interpolateTemplate } from '../services/telegramService';
 
 const router = Router();
 
@@ -560,6 +561,27 @@ router.post('/workflow-action', async (req, res) => {
                     title: updated.title,
                 };
                 console.log(`[CRE] Resource toggled: ${updated.title} → ${updated.isActive ? 'active' : 'inactive'}`);
+                break;
+            }
+
+            case 'telegram_notify': {
+                const { chatId, message, botToken: blockBotToken, context: msgContext } = req.body;
+                if (!chatId) {
+                    return res.status(400).json({ error: 'chatId is required for telegram_notify' });
+                }
+                const token = blockBotToken || process.env.TELEGRAM_BOT_TOKEN;
+                if (!token) {
+                    return res.status(400).json({ error: 'No Telegram bot token provided (set TELEGRAM_BOT_TOKEN or pass botToken)' });
+                }
+                const interpolated = interpolateTemplate(message || '', msgContext || {});
+                const telegramResult = await sendTelegramMessage(token, chatId, interpolated);
+                result = {
+                    action: 'telegram_notify',
+                    chatId,
+                    messageSent: telegramResult.ok,
+                    description: telegramResult.description,
+                };
+                console.log(`[CRE] Telegram notify: chatId=${chatId}, ok=${telegramResult.ok}`);
                 break;
             }
 

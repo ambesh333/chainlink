@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { Clock, Database, Brain, GitBranch, Zap, PlayCircle, StopCircle } from 'lucide-react';
+import { Clock, Database, Brain, GitBranch, Zap, PlayCircle, StopCircle, Send } from 'lucide-react';
 
 export interface BlockTemplate {
     type: 'trigger' | 'data' | 'ai' | 'condition' | 'action';
@@ -58,6 +58,14 @@ const blocks: { category: string; color: string; icon: React.ElementType; items:
         items: [
             { type: 'action', blockType: 'update_price', label: 'Update Price', description: 'Change resource price' },
             { type: 'action', blockType: 'toggle_resource', label: 'Toggle Resource', description: 'Enable/disable resource' },
+        ],
+    },
+    {
+        category: 'Notifications',
+        color: '#3B82F6',
+        icon: Send,
+        items: [
+            { type: 'action', blockType: 'telegram_notify', label: 'Telegram Notify', description: 'Send message via Telegram bot' },
         ],
     },
 ];

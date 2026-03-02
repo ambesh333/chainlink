@@ -320,6 +320,10 @@ export const testWorkflow = async (req: Request, res: Response) => {
                 logLines.push(`  -> Would update price to ${Math.round(price * 1000000) / 1000000} ETH (mode: ${config.mode || 'ai_recommended'})`);
             } else if (blockType === 'toggle_resource') {
                 logLines.push(`  -> Would set resource ${config.active !== false ? 'active' : 'inactive'}`);
+            } else if (blockType === 'telegram_notify') {
+                const chatId = config.chatId || '(not set)';
+                const msg = config.message || '(no message)';
+                logLines.push(`  -> Would send Telegram message to ${chatId}: ${msg}`);
             }
 
             // Follow edges (for non-condition nodes)
