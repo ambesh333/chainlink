@@ -1,96 +1,106 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import Link from 'next/link';
 
-const texts = [
-    'AI-powered data feeds',
-    'Decentralized oracles',
-    'Secure escrow',
-    'Private transactions'
+// Inline SVG avatars — no external dependency needed
+const AVATAR_COLORS = ['#375BD2', '#7C3AED', '#0EA5E9', '#10B981'];
+function AvatarCircle({ color, letter }: { color: string; letter: string }) {
+    return (
+        <div
+            className="w-8 h-8 rounded-full border-2 border-[#030712] flex items-center justify-center text-white text-xs font-bold"
+            style={{ background: color }}
+        >
+            {letter}
+        </div>
+    );
+}
+const AVATARS = [
+    { color: AVATAR_COLORS[0], letter: 'A' },
+    { color: AVATAR_COLORS[1], letter: 'B' },
+    { color: AVATAR_COLORS[2], letter: 'C' },
+    { color: AVATAR_COLORS[3], letter: 'D' },
 ];
 
 export default function Hero() {
-    const [currentTextIndex, setCurrentTextIndex] = useState(0);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setCurrentTextIndex((prev) => (prev + 1) % texts.length);
-        }, 3000);
-
-        return () => clearInterval(interval);
-    }, []);
-
     return (
-        <section className="relative min-h-screen flex items-center overflow-hidden">
-            {/* Gradient Background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/95 to-blue-900/40" />
+        <section className="relative min-h-screen flex flex-col overflow-hidden bg-[#030712]">
 
-            {/* ASCII Hands Background */}
-            <div className="absolute inset-0 opacity-30">
-                <Image
-                    src="/ascii-hands.png"
-                    alt="Background"
-                    fill
-                    className="object-cover"
-                    priority
+            {/* ── Banner image sits in the bottom half ── */}
+            <div className="absolute inset-0">
+                <video
+                    src="/landing/main_video.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover object-bottom"
+                    style={{ opacity: 0.85 }}
+                />
+                {/* top dark fade so text stays readable */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#030712] via-[#030712]/60 to-transparent" />
+                {/* subtle blue radial glow at centre-top */}
+                <div
+                    className="absolute inset-0"
+                    style={{
+                        background:
+                            'radial-gradient(ellipse 70% 40% at 50% 10%, rgba(55,91,210,0.18) 0%, transparent 70%)',
+                    }}
                 />
             </div>
 
-            {/* Vertical Light Glow */}
-            <div className="absolute right-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-blue-400 to-transparent opacity-60" />
+            {/* ── Content (centred) ── */}
+            <div className="relative z-10 flex flex-1 flex-col items-center justify-start text-center px-6 pt-48 pb-16">
+                {/* Headline */}
+                <motion.h1
+                    className="text-5xl md:text-[4.25rem] font-bold text-white leading-[1.12] tracking-tight max-w-3xl drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, delay: 0.1 }}
+                >
+                    Monetise Your Data with&nbsp;the&nbsp;Best&nbsp;AI&nbsp;Agent
+                </motion.h1>
 
-            {/* Content */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 py-32">
-                <div className="grid md:grid-cols-2 gap-12 items-center">
-                    {/* Left Side - Text Content */}
-                    <div className="space-y-8">
-                        <motion.h1
-                            className="text-5xl md:text-7xl font-light text-white leading-tight"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.8 }}
-                        >
-                            <motion.span
-                                key={currentTextIndex}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.5 }}
-                                className="block"
-                            >
-                                {texts[currentTextIndex]},
-                            </motion.span>
-                            <span className="block mt-2">
-                                redefined for the next generation.
-                            </span>
-                        </motion.h1>
+                {/* Sub-headline */}
+                <motion.p
+                    className="mt-6 text-base md:text-lg text-white/90 font-bold max-w-xl leading-relaxed drop-shadow-sm"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, delay: 0.25 }}
+                >
+                    List your data resources the right way — with AI-powered pricing, on-chain escrow, and
+                    frictionless access for builders worldwide.
+                </motion.p>
 
-                        <motion.button
-                            className="px-8 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white rounded-full transition-all text-sm font-medium"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.5 }}
-                        >
-                            GET STARTED
-                        </motion.button>
+                {/* CTA buttons  */}
+                <motion.div
+                    className="mt-10 flex items-center gap-4"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, delay: 0.4 }}
+                >
+                    {/* Ghost / outline button */}
+                    <Link
+                        href="/dashboard/explore"
+                        className="px-7 py-3 rounded-full border border-white/25 text-white text-sm font-semibold
+                                   bg-white/5 hover:bg-white/10 backdrop-blur-sm transition-all duration-200"
+                    >
+                        Explore Resources
+                    </Link>
 
-                        <motion.p
-                            className="text-sm text-gray-400 max-w-md"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.7 }}
-                        >
-                            Our agent protocol redefines your workflow — intuitive, atmospheric, and built for control. No clutter. No friction. Just you and your secure data flow, moving at your pace.
-                        </motion.p>
-                    </div>
-
-                </div>
+                    {/* Solid white button */}
+                    <Link
+                        href="/dashboard"
+                        className="px-7 py-3 rounded-full bg-white text-gray-900 text-sm font-bold
+                                   hover:bg-gray-100 transition-all duration-200 shadow-lg shadow-white/10"
+                    >
+                        Get Started
+                    </Link>
+                </motion.div>
             </div>
 
-            {/* Bottom Fade */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent" />
+            {/* bottom vignette so the arc blends into the next section */}
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#030712] to-transparent pointer-events-none" />
         </section>
     );
 }

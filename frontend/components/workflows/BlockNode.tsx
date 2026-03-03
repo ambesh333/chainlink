@@ -10,12 +10,12 @@ export interface BlockNodeData {
     [key: string]: unknown;
 }
 
-const typeConfig: Record<string, { color: string; bg: string; border: string; icon: React.ElementType }> = {
-    trigger: { color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)', icon: Clock },
-    data: { color: '#375BD2', bg: 'rgba(55,91,210,0.1)', border: 'rgba(55,91,210,0.3)', icon: Database },
-    ai: { color: '#7C3AED', bg: 'linear-gradient(135deg, rgba(55,91,210,0.1), rgba(139,92,246,0.1))', border: 'rgba(124,58,237,0.3)', icon: Brain },
-    condition: { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)', icon: GitBranch },
-    action: { color: '#10B981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', icon: Zap },
+const typeConfig: Record<string, { color: string; icon: React.ElementType }> = {
+    trigger: { color: '#a78bfa', icon: Clock },
+    data: { color: '#60a5fa', icon: Database },
+    ai: { color: '#c084fc', icon: Brain },
+    condition: { color: '#fbbf24', icon: GitBranch },
+    action: { color: '#34d399', icon: Zap },
 };
 
 const blockTypeIcons: Record<string, React.ElementType> = {
@@ -32,49 +32,62 @@ function BlockNodeComponent({ data, type, selected }: NodeProps) {
 
     const isStart = nodeData.blockType === 'start';
     const isStop = nodeData.blockType === 'stop';
+    const isCondition = nodeType === 'condition';
 
-    // Only the start block has no input handle. All others (including cron) accept inputs.
     const showInputHandle = !isStart;
-    // Only the stop block has no output handle.
     const showOutputHandle = !isStop;
 
     return (
         <div
             style={{
-                background: config.bg,
-                borderColor: selected ? config.color : config.border,
-                boxShadow: selected ? `0 0 20px ${config.color}40` : 'none',
+                background: selected
+                    ? `linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))`
+                    : `linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))`,
+                borderColor: selected ? config.color : `${config.color}44`,
+                boxShadow: selected
+                    ? `0 0 0 1px ${config.color}60, 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)`
+                    : `0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)`,
             }}
-            className="rounded-xl border-2 px-4 py-3 min-w-[200px] backdrop-blur-sm transition-all"
+            className="rounded-xl border px-4 py-3 min-w-[190px] backdrop-blur-xl transition-all duration-200 relative overflow-hidden"
         >
+            {/* glassmorphism highlight strip */}
+            <div
+                style={{ background: `linear-gradient(90deg, ${config.color}20, transparent)` }}
+                className="absolute inset-x-0 top-0 h-[1px]"
+            />
+
             {showInputHandle && (
                 <Handle
                     type="target"
-                    position={Position.Top}
-                    className="!w-3 !h-3 !border-2 !rounded-full"
-                    style={{ background: config.color, borderColor: config.border }}
+                    position={Position.Left}
+                    className="!w-3 !h-3 !border-2 !rounded-full !-left-[6px]"
+                    style={{ background: config.color, borderColor: `${config.color}60` }}
                 />
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
                 <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: `${config.color}20` }}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{
+                        background: `${config.color}18`,
+                        boxShadow: `0 0 12px ${config.color}30`,
+                        border: `1px solid ${config.color}30`,
+                    }}
                 >
                     <Icon size={16} style={{ color: config.color }} />
                 </div>
                 <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: config.color }}>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: `${config.color}cc` }}>
                         {isStart ? 'start' : isStop ? 'stop' : nodeType}
                     </div>
-                    <div className="text-sm font-medium text-white">
+                    <div className="text-sm font-medium text-white/90 leading-tight">
                         {nodeData.label || nodeData.blockType}
                     </div>
                 </div>
             </div>
 
             {nodeData.config && Object.keys(nodeData.config).length > 0 && !isStart && !isStop && (
-                <div className="mt-2 text-[11px] text-gray-400 truncate max-w-[180px]">
+                <div className="mt-2 text-[11px] text-white/40 truncate max-w-[180px]">
                     {nodeData.blockType === 'cron' && nodeData.config.schedule && (
                         <span>Every {nodeData.config.schedule}</span>
                     )}
@@ -91,29 +104,29 @@ function BlockNodeComponent({ data, type, selected }: NodeProps) {
             )}
 
             {showOutputHandle && (
-                nodeType === 'condition' ? (
+                isCondition ? (
                     <>
                         <Handle
                             type="source"
-                            position={Position.Bottom}
+                            position={Position.Right}
                             id="true"
-                            className="!w-3 !h-3 !border-2 !rounded-full"
-                            style={{ background: '#10B981', borderColor: '#10B98180', left: '30%' }}
+                            className="!w-3 !h-3 !border-2 !rounded-full !-right-[6px]"
+                            style={{ background: '#34d399', borderColor: '#34d39980', top: '35%' }}
                         />
                         <Handle
                             type="source"
-                            position={Position.Bottom}
+                            position={Position.Right}
                             id="false"
-                            className="!w-3 !h-3 !border-2 !rounded-full"
-                            style={{ background: '#EF4444', borderColor: '#EF444480', left: '70%' }}
+                            className="!w-3 !h-3 !border-2 !rounded-full !-right-[6px]"
+                            style={{ background: '#f87171', borderColor: '#f8717180', top: '65%' }}
                         />
                     </>
                 ) : (
                     <Handle
                         type="source"
-                        position={Position.Bottom}
-                        className="!w-3 !h-3 !border-2 !rounded-full"
-                        style={{ background: config.color, borderColor: config.border }}
+                        position={Position.Right}
+                        className="!w-3 !h-3 !border-2 !rounded-full !-right-[6px]"
+                        style={{ background: config.color, borderColor: `${config.color}60` }}
                     />
                 )
             )}

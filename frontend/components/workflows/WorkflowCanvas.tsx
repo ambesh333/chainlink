@@ -47,14 +47,14 @@ let nodeIdCounter = 100;
 const DEFAULT_START_NODE: Node = {
     id: 'node_start',
     type: 'trigger',
-    position: { x: 400, y: 50 },
+    position: { x: 60, y: 200 },
     data: { blockType: 'start', label: 'Start', config: {} },
 };
 
 const DEFAULT_STOP_NODE: Node = {
     id: 'node_stop',
     type: 'action',
-    position: { x: 400, y: 500 },
+    position: { x: 700, y: 200 },
     data: { blockType: 'stop', label: 'Stop', config: {} },
 };
 
@@ -78,7 +78,8 @@ function WorkflowCanvasInner({ initialNodes = [], initialEdges = [], resources, 
                 const newEdges = addEdge(
                     {
                         ...params,
-                        style: { stroke: '#ffffff20', strokeWidth: 2 },
+                        type: 'smoothstep',
+                        style: { stroke: '#7c3aed55', strokeWidth: 2 },
                         animated: true,
                     },
                     eds
@@ -121,8 +122,8 @@ function WorkflowCanvasInner({ initialNodes = [], initialEdges = [], resources, 
                 (n) => (n.data as BlockNodeData).blockType !== 'start' && (n.data as BlockNodeData).blockType !== 'stop'
             );
             const pos = position || {
-                x: 400,
-                y: 150 + nonFlowNodes.length * 120,
+                x: 260 + nonFlowNodes.length * 220,
+                y: 200,
             };
 
             const newNode: Node = {
@@ -150,7 +151,8 @@ function WorkflowCanvasInner({ initialNodes = [], initialEdges = [], resources, 
                         id: `edge_${lastNode.id}_${id}`,
                         source: lastNode.id,
                         target: id,
-                        style: { stroke: '#ffffff20', strokeWidth: 2 },
+                        type: 'smoothstep',
+                        style: { stroke: '#7c3aed55', strokeWidth: 2 },
                         animated: true,
                     };
                     const updated = [...eds, newEdge];
@@ -241,7 +243,12 @@ function WorkflowCanvasInner({ initialNodes = [], initialEdges = [], resources, 
     );
 
     return (
-        <div className="flex h-full">
+        <div
+            className="flex h-full"
+            style={{
+                background: 'radial-gradient(ellipse at 30% 20%, rgba(124,58,237,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(55,91,210,0.06) 0%, transparent 60%), #080810',
+            }}
+        >
             <BlockPalette onAddBlock={addBlock} />
             <div className="flex-1" ref={reactFlowWrapper}>
                 <ReactFlow
@@ -258,14 +265,15 @@ function WorkflowCanvasInner({ initialNodes = [], initialEdges = [], resources, 
                     nodeTypes={nodeTypes}
                     fitView
                     proOptions={{ hideAttribution: true }}
-                    style={{ background: '#0a0a0f' }}
+                    style={{ background: 'transparent' }}
                     deleteKeyCode={['Backspace', 'Delete']}
                     defaultEdgeOptions={{
-                        style: { stroke: '#ffffff20', strokeWidth: 2 },
+                        type: 'smoothstep',
+                        style: { stroke: '#7c3aed55', strokeWidth: 2 },
                         animated: true,
                     }}
                 >
-                    <Background variant={BackgroundVariant.Dots} color="#ffffff08" gap={20} />
+                    <Background variant={BackgroundVariant.Dots} color="#ffffff18" gap={24} size={1.5} />
                     <Controls
                         className="!bg-[#0d0d14] !border-white/10 !rounded-lg [&>button]:!bg-[#0d0d14] [&>button]:!border-white/10 [&>button]:!text-white [&>button:hover]:!bg-white/5"
                     />
