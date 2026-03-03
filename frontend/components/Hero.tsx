@@ -58,7 +58,7 @@ export default function Hero() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.1 }}
                 >
-                    Monetise Your Data with&nbsp;the&nbsp;Best&nbsp;AI&nbsp;Agent
+                    The End to End Marketplace for&nbsp;AI‑Native&nbsp;Data
                 </motion.h1>
 
                 {/* Sub-headline */}
@@ -68,8 +68,8 @@ export default function Hero() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.25 }}
                 >
-                    List your data resources the right way — with AI-powered pricing, on-chain escrow, and
-                    frictionless access for builders worldwide.
+                    Launch, sell, and automate data resources in one place — AI workflow builder, AI dispute resolution,
+                    and x402 escrow payments built in for a full end‑to‑end marketplace.
                 </motion.p>
 
                 {/* CTA buttons  */}

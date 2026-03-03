@@ -2,26 +2,26 @@ import Image from 'next/image';
 
 const layerInfo = [
     {
-        title: "Payment Initialization",
-        description: "Agent initiates a private payment request through the x402 protocol",
+        title: "Gateway Request",
+        description: "Agent requests a resource via the x402 gateway and receives a 402 challenge",
         color: "#2D50A2",
         image: "/bento/landscape2.png"
     },
     {
-        title: "x402 Protocol Verification",
-        description: "Chainlink oracle verifies the payment without exposing transaction details",
+        title: "402 Payment Requirements",
+        description: "Backend returns escrow key, contract address, and required amount",
         color: "#132A63",
         image: "/bento/landscape3.png"
     },
     {
-        title: "Chainlink Agent Privacy Layer",
-        description: "Funds locked in secure escrow while maintaining complete privacy",
+        title: "On-Chain Escrow Deposit",
+        description: "Agent deposits ETH, retries with X-Payment header, and receives content",
         color: "#041A54",
         image: "/bento/landscape1.png"
     },
     {
-        title: "Settlement Complete",
-        description: "Transaction verified, privacy preserved, settlement finalized",
+        title: "Settlement or Dispute",
+        description: "Agent calls requestSettlement or raiseDispute; CRE finalizes on-chain",
         color: "#0D1B39",
         image: "/bento/landscape2.png"
     }

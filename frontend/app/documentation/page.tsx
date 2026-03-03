@@ -283,9 +283,6 @@ export default function DocumentationPage() {
                                 <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">3</span>
                                 x402 Gateway Flow
                             </h2>
-                            <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
-                                <img src="/landing/mcp.jpeg" alt="Protocol Integration" className="w-full h-auto" />
-                            </div>
                             <p className="text-gray-400 text-lg leading-relaxed mb-6">
                                 The gateway exposes a native HTTP 402 flow so AI agents can pay and access resources programmatically.
                                 Below is the exact flow used in the hackathon demo:
