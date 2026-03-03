@@ -16,7 +16,7 @@ export default function BentoGrid() {
                     {/* Left: Portrait Image */}
                     <div className="relative rounded-3xl overflow-hidden border border-white/10 group h-[500px] md:h-auto md:row-span-2">
                         <img
-                            src="/bento/portrait.png"
+                            src="/bento/landscape1.png"
                             alt="Chainlink Agent Marketplace"
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
@@ -27,7 +27,7 @@ export default function BentoGrid() {
                     {/* Right Top: Landscape Image 1 */}
                     <div className="relative rounded-3xl overflow-hidden border border-white/10 group h-[240px] md:h-auto">
                         <img
-                            src="/bento/landscape1.png"
+                            src="/bento/landscape2.png"
                             alt="Privacy intact with Chainlink Agent"
                             className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         />
@@ -38,7 +38,7 @@ export default function BentoGrid() {
                     {/* Right Bottom: Landscape Image 2 */}
                     <div className="relative rounded-3xl overflow-hidden border border-white/10 group h-[240px] md:h-auto">
                         <img
-                            src="/bento/landscape2.png"
+                            src="/bento/landscape3.png"
                             alt="Powered by Ethereum and Chainlink"
                             className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         />

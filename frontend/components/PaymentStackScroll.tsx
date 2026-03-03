@@ -5,25 +5,25 @@ const layerInfo = [
         title: "Payment Initialization",
         description: "Agent initiates a private payment request through the x402 protocol",
         color: "#2D50A2",
-        image: "/landing/payment_init.png"
+        image: "/bento/landscape2.png"
     },
     {
         title: "x402 Protocol Verification",
         description: "Chainlink oracle verifies the payment without exposing transaction details",
         color: "#132A63",
-        image: "/landing/x402_verify.png"
+        image: "/bento/landscape3.png"
     },
     {
         title: "Chainlink Agent Privacy Layer",
         description: "Funds locked in secure escrow while maintaining complete privacy",
         color: "#041A54",
-        image: "/landing/privacy_layer.png"
+        image: "/bento/landscape1.png"
     },
     {
         title: "Settlement Complete",
         description: "Transaction verified, privacy preserved, settlement finalized",
         color: "#0D1B39",
-        image: "/landing/settlement.png"
+        image: "/bento/landscape2.png"
     }
 ];
 
