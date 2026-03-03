@@ -89,7 +89,7 @@ export default function DocumentationPage() {
                     <div className="max-w-3xl mx-auto px-6 py-16">
                         {/* Hero Banner */}
                         <div className="mb-16 rounded-2xl overflow-hidden border border-white/10">
-                            <img src="/docs/banner3.jpg" alt="Chainlink Agent" className="w-full h-auto" />
+                            <img src="/docs/banner3.png" alt="Chainlink Agent" className="w-full h-auto" />
                         </div>
 
                         {/* 1. Overview */}
@@ -418,7 +418,7 @@ export default function DocumentationPage() {
                                 Smart Contracts
                             </h2>
                             <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
-                                <img src="/docs/banner1.jpg" alt="Smart Contracts" className="w-full h-auto" />
+                                <img src="/docs/banner1.png" alt="Smart Contracts" className="w-full h-auto" />
                             </div>
 
                             {/* EscrowMarketplace */}

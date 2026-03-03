@@ -14,7 +14,7 @@ export default function Navbar() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center">
                         <Image
-                            src="/icon.svg"
+                            src="/icon2.png"
                             alt="Chainlink Agent Logo"
                             width={90}
                             height={90}

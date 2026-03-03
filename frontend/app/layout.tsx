@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
     title: "Chainlink Agent",
     description: "Ethereum-based agent with Chainlink integration",
+    icons: {
+        icon: "/icon2.png",
+    },
 };
 
 export default function RootLayout({

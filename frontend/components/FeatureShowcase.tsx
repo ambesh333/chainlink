@@ -1,6 +1,8 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 
 interface FeatureItem {
     title: string;
@@ -9,6 +11,57 @@ interface FeatureItem {
     imageSrc?: string;
     imageAlt: string;
     tags: string[];
+    videoSrc?: string;
+    videoPoster?: string;
+}
+
+function FeatureMedia({ feature, initialSoundOn }: { feature: FeatureItem; initialSoundOn: boolean }) {
+    const [soundOn, setSoundOn] = useState(initialSoundOn);
+
+    return (
+        <div className="aspect-video bg-gradient-to-br from-[#060E1F] to-[#020716] relative">
+            {feature.videoSrc ? (
+                <>
+                    <video
+                        src={feature.videoSrc}
+                        poster={feature.videoPoster || feature.imageSrc}
+                        autoPlay
+                        loop
+                        muted={!soundOn}
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-cover"
+                        aria-label={feature.imageAlt}
+                    />
+                    <button
+                        type="button"
+                        aria-label={soundOn ? 'Mute video' : 'Unmute video'}
+                        onClick={() => setSoundOn((prev) => !prev)}
+                        className="absolute bottom-3 right-3 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors backdrop-blur-sm border border-white/10"
+                    >
+                        {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                    </button>
+                </>
+            ) : feature.imageSrc ? (
+                <Image
+                    src={feature.imageSrc}
+                    alt={feature.imageAlt}
+                    fill
+                    className="object-cover"
+                />
+            ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center p-8">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#2D50A2]/20 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-[#2D50A2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <p className="text-gray-500 text-sm">{feature.imageAlt}</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 const features: FeatureItem[] = [
@@ -16,25 +69,25 @@ const features: FeatureItem[] = [
         title: 'Merchant Overview & Resource Hub',
         subtitle: 'Everything in One Place',
         description: 'Manage your catalog, gateway URLs, pricing, and trust scores while tracking transactions, earnings, settlements, and AI-assisted disputes from a single merchant dashboard.',
-        imageSrc: '/landing/merchant.png',
+        videoSrc: '/landing/merchant_console2.mp4',
         imageAlt: 'Merchant Overview Dashboard',
         tags: ['Resources', 'Transactions', 'Trust Score'],
-    },
-    {
-        title: 'Workflow Builder for Resources',
-        subtitle: 'Automate Operations',
-        description: 'Create visual workflows to automate pricing, availability, and resource actions. Generate flows with AI, schedule runs, and monitor status and history as your marketplace scales.',
-        imageSrc: '/landing/mcp.jpeg',
-        imageAlt: 'Workflow Builder',
-        tags: ['Visual Builder', 'AI Generated', 'Scheduled Runs'],
     },
     {
         title: 'AI Agent Integration Demo',
         subtitle: 'x402 in Action',
         description: 'Walk through the end-to-end agent flow: fetch a paywalled resource, open on-chain escrow, sign payment, and verify settlement or disputes in a realistic terminal demo.',
-        imageSrc: '/landing/main_banner.png',
+        videoSrc: '/landing/demo_cli.mp4',
         imageAlt: 'AI Agent Integration Demo',
         tags: ['x402', 'On-Chain Escrow', 'Settlement'],
+    },
+    {
+        title: 'Workflow Builder for Resources',
+        subtitle: 'Automate Operations',
+        description: 'Create visual workflows to automate pricing, availability, and resource actions. Generate flows with AI, schedule runs, and monitor status and history as your marketplace scales.',
+        videoSrc: '/landing/workflow.mp4',
+        imageAlt: 'Workflow Builder',
+        tags: ['Visual Builder', 'AI Generated', 'Scheduled Runs'],
     }
 ];
 
@@ -56,6 +109,7 @@ export default function FeatureShowcase() {
                 <div className="space-y-32">
                     {features.map((feature, index) => {
                         const isReversed = index % 2 === 1;
+                        const initialSoundOn = Boolean(feature.videoSrc) && index === 0;
 
                         return (
                             <div
@@ -65,27 +119,7 @@ export default function FeatureShowcase() {
                                 {/* Image */}
                                 <div className="flex-1 w-full">
                                     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-[#2D50A2]/10">
-                                        <div className="aspect-video bg-gradient-to-br from-[#060E1F] to-[#020716] relative">
-                                            {feature.imageSrc ? (
-                                                <Image
-                                                    src={feature.imageSrc}
-                                                    alt={feature.imageAlt}
-                                                    fill
-                                                    className="object-cover"
-                                                />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <div className="text-center p-8">
-                                                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#2D50A2]/20 flex items-center justify-center">
-                                                            <svg className="w-8 h-8 text-[#2D50A2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                            </svg>
-                                                        </div>
-                                                        <p className="text-gray-500 text-sm">{feature.imageAlt}</p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <FeatureMedia feature={feature} initialSoundOn={initialSoundOn} />
 
                                         {/* Glow effect */}
                                         <div className={`absolute -inset-1 bg-gradient-to-r from-[#2D50A2]/20 to-transparent blur-xl -z-10 ${isReversed ? 'rotate-180' : ''}`} />
