@@ -8,10 +8,11 @@ const sections = [
     { id: 'overview', title: 'Hackathon Overview' },
     { id: 'escrow', title: 'Escrow Lifecycle' },
     { id: 'x402', title: 'x402 Gateway Flow' },
-    { id: 'cre', title: 'CRE Workflows' },
+    { id: 'workflows', title: 'Merchant Workflows' },
+    { id: 'cre', title: 'CRE Integration' },
     { id: 'contracts', title: 'Smart Contracts' },
     { id: 'architecture', title: 'Architecture & Stack' },
-    { id: 'api', title: 'API Reference' },
+    { id: 'api', title: 'AI Agent API' },
     { id: 'future', title: 'Roadmap & Next Steps' },
 ];
 
@@ -127,10 +128,10 @@ export default function DocumentationPage() {
                                 className={`text-gray-400 text-lg leading-relaxed mb-10 max-w-2xl ${overviewVisible ? 'animate-fade-up' : 'opacity-0'}`}
                                 style={{ animationDelay: '0.35s' }}
                             >
-                                Chainlink Agent is our CRE Hackathon build: a trust-minimized marketplace where AI agents
-                                programmatically buy private resources via the x402 HTTP payment flow and on-chain escrow
-                                on Ethereum Sepolia. Settlement, disputes, and expiry are automated by{' '}
-                                <span className="text-[#375BD2] font-semibold">Chainlink CRE</span> workflows.
+                                Chainlink Agent is our CRE Hackathon build: an end-to-end marketplace where merchants list
+                                resources, build automations, and AI agents purchase via x402 + on-chain escrow on Ethereum
+                                Sepolia. Settlement, disputes, expiry, and workflow actions are automated by{' '}
+                                <span className="text-[#375BD2] font-semibold">Chainlink CRE</span>.
                             </p>
 
                             {/* Feature Cards — Pinterest-style staggered grid */}
@@ -138,29 +139,29 @@ export default function DocumentationPage() {
                                 {[
                                     {
                                         icon: <Zap size={20} />,
-                                        title: 'Merchant Console',
-                                        desc: 'Create resources, build visual workflows, and track transactions, earnings, trust scores, and disputes from one dashboard.',
+                                        title: 'Merchant Marketplace',
+                                        desc: 'List resources, copy gateway URLs, and track transactions, earnings, trust scores, and disputes from one dashboard.',
                                         color: '#375BD2',
                                         delay: '0.4s',
                                     },
                                     {
-                                        icon: <Lock size={20} />,
-                                        title: 'x402 Gateway',
-                                        desc: 'HTTP 402 + X-Payment header enables AI agents to purchase and access resources programmatically.',
+                                        icon: <Workflow size={20} />,
+                                        title: 'Workflow Builder',
+                                        desc: 'Create visual workflows or generate them with AI to automate pricing and resource actions.',
                                         color: '#4C8BF5',
                                         delay: '0.5s',
                                     },
                                     {
-                                        icon: <Workflow size={20} />,
-                                        title: 'CRE Automation',
-                                        desc: 'Settlement verifier, dispute resolver, and expiry watchdog finalize outcomes on-chain.',
+                                        icon: <Lock size={20} />,
+                                        title: 'x402 + Escrow',
+                                        desc: 'AI agents complete a 402 payment flow and access resources after on-chain escrow deposit.',
                                         color: '#10B981',
                                         delay: '0.6s',
                                     },
                                     {
                                         icon: <Bot size={20} />,
-                                        title: 'AI Dispute Engine',
-                                        desc: 'CRE workflows trigger AI analysis of resources and merchant context to issue fair dispute verdicts.',
+                                        title: 'CRE Dispute & Settlement',
+                                        desc: 'CRE workflows verify delivery, run AI dispute analysis, and finalize outcomes on-chain.',
                                         color: '#7C3AED',
                                         delay: '0.7s',
                                     },
@@ -197,9 +198,9 @@ export default function DocumentationPage() {
                             >
                                 {[
                                     { value: 'CRE', label: 'Automation' },
+                                    { value: 'Workflows', label: 'Builder' },
                                     { value: 'x402', label: 'Payments' },
                                     { value: 'Sepolia', label: 'Network' },
-                                    { value: 'AI', label: 'Dispute Engine' },
                                 ].map((stat) => (
                                     <div key={stat.label} className="group cursor-default">
                                         <div className="text-xl font-bold text-white group-hover:text-[#375BD2] transition-colors duration-300">
@@ -315,11 +316,47 @@ export default function DocumentationPage() {
                             </div>
                         </section>
 
-                        {/* 4. CRE Workflows */}
-                        <section id="cre" className="mb-20">
+                        {/* 4. Merchant Workflows */}
+                        <section id="workflows" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
                                 <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">4</span>
-                                CRE Workflows
+                                Merchant Workflows
+                            </h2>
+                            <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
+                                <img src="/docs/banner2.jpg" alt="Workflow Builder" className="w-full h-auto" />
+                            </div>
+                            <p className="text-gray-400 text-lg leading-relaxed mb-6">
+                                Merchants can build visual workflows to automate pricing, availability, and resource actions.
+                                Workflows are created in the dashboard or generated with AI, then executed by the CRE workflow engine.
+                            </p>
+                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
+                                <ol className="space-y-4 text-gray-400">
+                                    {[
+                                        ['Create a workflow', 'Use the workflow builder or AI generator to define nodes, edges, and schedule.'],
+                                        ['Save & activate', 'Workflow definitions are stored with status and schedule.'],
+                                        ['CRE engine picks up', 'CRE polls active workflows and triggers runs on schedule.'],
+                                        ['Fetch live stats', 'Engine pulls resource stats and transaction data for conditions.'],
+                                        ['Execute actions', 'CRE calls workflow actions to update prices or toggle resources.'],
+                                    ].map(([step, desc], i) => (
+                                        <li key={step} className="flex items-start gap-3">
+                                            <span className="w-6 h-6 bg-[#375BD2] text-white text-xs font-bold rounded-full flex items-center justify-center shrink-0">{i + 1}</span>
+                                            <span><strong className="text-white">{step}:</strong> {desc}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                            <div className="bg-gradient-to-r from-[#375BD2]/10 to-transparent rounded-xl border border-[#375BD2]/20 p-5">
+                                <p className="text-[#4C8BF5] text-sm">
+                                    <strong>Example:</strong> Auto-reduce price if disputes exceed a threshold, or pause a resource if settlement rate drops.
+                                </p>
+                            </div>
+                        </section>
+
+                        {/* 5. CRE Integration */}
+                        <section id="cre" className="mb-20">
+                            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">5</span>
+                                CRE Integration
                             </h2>
                             <p className="text-gray-400 text-lg leading-relaxed mb-6">
                                 Chainlink CRE (Compute Runtime Environment) powers three workflows that automate settlement,
@@ -327,6 +364,22 @@ export default function DocumentationPage() {
                                 <code className="text-white bg-white/10 px-1.5 py-0.5 rounded text-xs ml-1">DisputeConsumer</code>,
                                 and syncs the backend via webhook endpoints.
                             </p>
+                            <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-5 mb-6">
+                                <h3 className="text-lg font-semibold text-white mb-3">Integration Points</h3>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    {[
+                                        ['On-chain events', 'CRE listens for SettlementRequested and DisputeRaised from EscrowMarketplace.'],
+                                        ['Webhook calls', 'CRE calls backend endpoints to verify delivery and run AI dispute analysis.'],
+                                        ['Signed reports', 'CRE submits reports to DisputeConsumer to finalize on-chain outcomes.'],
+                                        ['Workflow engine', 'CRE also runs merchant workflow schedules and executes actions.'],
+                                    ].map(([title, desc]) => (
+                                        <div key={title} className="bg-[#111] rounded-xl border border-white/10 p-4">
+                                            <h4 className="text-white font-medium mb-1">{title}</h4>
+                                            <p className="text-gray-500 text-sm">{desc}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="grid gap-6">
                                 {/* Settlement Verifier */}
                                 <div className="bg-[#111] rounded-2xl border border-white/10 p-6">
@@ -408,10 +461,10 @@ export default function DocumentationPage() {
                             </div>
                         </section>
 
-                        {/* 5. Smart Contracts */}
+                        {/* 6. Smart Contracts */}
                         <section id="contracts" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">5</span>
+                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">6</span>
                                 Smart Contracts
                             </h2>
                             <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
@@ -462,18 +515,28 @@ export default function DocumentationPage() {
         └── payMerchant = false → calls resolveDispute() (refund)`}</pre>
                                 </div>
                             </div>
+
+                            {/* ReceiverTemplate */}
+                            <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mt-6">
+                                <h3 className="text-xl font-semibold text-white mb-2">ReceiverTemplate.sol</h3>
+                                <p className="text-gray-400 text-sm mb-4">
+                                    Base receiver contract used to validate CRE reports. DisputeConsumer extends it to decode
+                                    <code className="text-white bg-white/10 px-1.5 py-0.5 rounded text-xs ml-1">{"{ escrowKey, payMerchant }"}</code>
+                                    and finalize outcomes on-chain.
+                                </p>
+                            </div>
                         </section>
 
-                        {/* 6. Architecture & Stack */}
+                        {/* 7. Architecture & Stack */}
                         <section id="architecture" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">6</span>
+                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">7</span>
                                 Architecture & Stack
                             </h2>
                             <div className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-6">
                                 <pre className="text-sm text-gray-400 overflow-x-auto">{`┌─────────────────────────────────────────────────────────────┐
 │          AI Agent + Frontend (Next.js Dashboard)            │
-│      Resource marketplace, workflows, demo terminal         │
+│   Marketplace, workflow builder, demo terminal              │
 └──────────────────────────┬──────────────────────────────────┘
                            │  x402 flow (402 → deposit → retry)
                            ▼
@@ -486,11 +549,11 @@ export default function DocumentationPage() {
 │                        │  PostgreSQL  │                      │
 └────────────┬───────────┴──────────────┬─────────────────────┘
              │                          │
-    verify-delivery             settlement-complete
-    analyze-dispute              dispute-resolved
+    verify-delivery             workflow actions
+    analyze-dispute              resource-stats
     expired-escrows
              │                          │
-             ▼                          │
+             ▼                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              CRE Workflows (Chainlink)                      │
 │  ┌────────────────┐ ┌───────────────┐ ┌────────────────┐   │
@@ -498,6 +561,9 @@ export default function DocumentationPage() {
 │  │  Verifier      │ │   Resolver    │ │   Watchdog     │   │
 │  └───────┬────────┘ └──────┬────────┘ └───────┬────────┘   │
 │          │  Signed reports  │                   │            │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Workflow Engine (merchant automations + schedules)   │   │
+│  └──────────────────────────────────────────────────────┘   │
 └──────────┼──────────────────┼───────────────────┼───────────┘
            │                  │                   │
            ▼                  ▼                   ▼
@@ -525,11 +591,11 @@ export default function DocumentationPage() {
                             </div>
                         </section>
 
-                        {/* 7. API Reference */}
+                        {/* 8. AI Agent API */}
                         <section id="api" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">7</span>
-                                API Reference
+                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">8</span>
+                                AI Agent API
                             </h2>
                             <div className="bg-gradient-to-r from-[#375BD2]/10 to-transparent rounded-xl border border-[#375BD2]/20 p-4 mb-6">
                                 <p className="text-[#4C8BF5] text-sm font-mono">
@@ -552,7 +618,7 @@ export default function DocumentationPage() {
                                 },
                                 {
                                     method: 'GET', color: 'blue', path: '/gateway/resource/:resourceId',
-                                    desc: 'Primary x402 gateway endpoint. Returns 402 with escrow key if unpaid, or resource content if paid.',
+                                    desc: 'Primary x402 gateway endpoint. Include X-Agent-Address to pre-create escrow. Returns 402 with escrow key if unpaid, or resource content if paid.',
                                     code: `// 402 JSON\n{ "paymentRequirements": { "amount": 0.002, "escrowContract": "0x..." }, "escrow": { "key": "0x..." } }`,
                                 },
                                 {
@@ -563,7 +629,7 @@ export default function DocumentationPage() {
                                 {
                                     method: 'POST', color: 'purple', path: '/gateway/settle',
                                     desc: 'Agent notifies backend after requestSettlement() or raiseDispute().',
-                                    code: `{ "transactionId": "tx_123", "status": "SETTLED" }`,
+                                    code: `{ "transactionId": "tx_123", "status": "SETTLED" | "DISPUTED" }`,
                                 },
                             ].map((ep) => (
                                 <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
@@ -577,189 +643,26 @@ export default function DocumentationPage() {
                                     </div>
                                 </div>
                             ))}
-
-                            {/* Auth */}
-                            <h3 className="text-lg font-semibold text-white mb-4 mt-8">Authentication</h3>
-                            {[
-                                {
-                                    method: 'GET', color: 'green', path: '/auth/nonce',
-                                    desc: 'Get a nonce for SIWE (Sign-In With Ethereum) authentication.',
-                                    code: `{ "nonce": "abc123xyz" }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/auth/verify',
-                                    desc: 'Submit signed SIWE message to receive a JWT token.',
-                                    code: `{ "message": "...", "signature": "0x..." }\n// Response: Sets httpOnly cookie + returns JWT`,
-                                },
-                            ].map((ep) => (
-                                <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className={`px-2 py-1 text-xs font-mono rounded ${ep.method === 'GET' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>{ep.method}</span>
-                                        <code className="text-white font-mono text-sm">{ep.path}</code>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3">{ep.desc}</p>
-                                    <div className="bg-black rounded-lg p-4">
-                                        <pre className="text-sm text-gray-400 overflow-x-auto">{ep.code}</pre>
-                                    </div>
+                            <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-5">
+                                <h3 className="text-lg font-semibold text-white mb-3">X-Payment Header</h3>
+                                <p className="text-gray-400 text-sm mb-4">
+                                    Agents send an <code className="text-white bg-white/10 px-1.5 py-0.5 rounded text-xs">X-Payment</code> header
+                                    after depositing on-chain. The payload is base64 JSON:
+                                </p>
+                                <div className="bg-black rounded-lg p-4">
+                                    <pre className="text-sm text-gray-400 overflow-x-auto">{`btoa(JSON.stringify({
+  version: 1,
+  scheme: "chainlink-escrow",
+  payload: { key, txHash, sender }
+}))`}</pre>
                                 </div>
-                            ))}
-
-                            {/* Resources */}
-                            <h3 className="text-lg font-semibold text-white mb-4 mt-8">Resources (JWT Required)</h3>
-                            {[
-                                {
-                                    method: 'GET', color: 'green', path: '/resources',
-                                    desc: 'List all resources for the authenticated merchant.',
-                                    code: `{ "resources": [{ "id": "abc123", "title": "My Dataset", "price": 0.002 }] }`,
-                                },
-                                {
-                                    method: 'GET', color: 'green', path: '/resources/stats',
-                                    desc: 'Dashboard overview stats (resources, transactions, disputes, trust score).',
-                                    code: `{ "totalResources": 3, "totalTransactions": 42, "trustScore": 81 }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/resources',
-                                    desc: 'Create a new resource listing (merchant only).',
-                                    code: `{ "title": "My Dataset", "type": "LINK", "price": 0.002, "network": "SEPOLIA", "token": "ETH" }`,
-                                },
-                            ].map((ep) => (
-                                <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className={`px-2 py-1 text-xs font-mono rounded ${ep.method === 'GET' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>{ep.method}</span>
-                                        <code className="text-white font-mono text-sm">{ep.path}</code>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3">{ep.desc}</p>
-                                    <div className="bg-black rounded-lg p-4">
-                                        <pre className="text-sm text-gray-400 overflow-x-auto">{ep.code}</pre>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* Workflows */}
-                            <h3 className="text-lg font-semibold text-white mb-4 mt-8">Workflows (JWT Required)</h3>
-                            <p className="text-gray-400 text-sm mb-4">Merchants can build automations that react to resource events and schedules.</p>
-                            {[
-                                {
-                                    method: 'GET', color: 'green', path: '/workflows',
-                                    desc: 'List all workflows for the authenticated merchant.',
-                                    code: `{ "workflows": [{ "id": "wf_123", "name": "Auto-Price", "status": "ACTIVE" }] }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/workflows',
-                                    desc: 'Create a new workflow with nodes and edges.',
-                                    code: `{ "name": "Auto-Price", "definition": { "nodes": [], "edges": [] } }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/workflows/generate',
-                                    desc: 'AI-generate a workflow from natural language.',
-                                    code: `{ "prompt": "Lower price if disputes > 3" }`,
-                                },
-                            ].map((ep) => (
-                                <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className={`px-2 py-1 text-xs font-mono rounded ${ep.method === 'GET' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>{ep.method}</span>
-                                        <code className="text-white font-mono text-sm">{ep.path}</code>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3">{ep.desc}</p>
-                                    <div className="bg-black rounded-lg p-4">
-                                        <pre className="text-sm text-gray-400 overflow-x-auto">{ep.code}</pre>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* Disputes */}
-                            <h3 className="text-lg font-semibold text-white mb-4 mt-8">Disputes (JWT Required)</h3>
-                            {[
-                                {
-                                    method: 'GET', color: 'green', path: '/disputes',
-                                    desc: 'Fetch all active disputes for the merchant.',
-                                    code: `{ "disputes": [{ "id": "tx_123", "status": "REFUND_REQUESTED" }] }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/disputes/:transactionId/ai-analyze',
-                                    desc: 'Trigger AI analysis for a dispute.',
-                                    code: `{ "ok": true, "confidence": 0.84 }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/disputes/:transactionId/resolve',
-                                    desc: 'Resolve a dispute after review.',
-                                    code: `{ "status": "SETTLED" }`,
-                                },
-                            ].map((ep) => (
-                                <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className={`px-2 py-1 text-xs font-mono rounded ${ep.method === 'GET' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>{ep.method}</span>
-                                        <code className="text-white font-mono text-sm">{ep.path}</code>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3">{ep.desc}</p>
-                                    <div className="bg-black rounded-lg p-4">
-                                        <pre className="text-sm text-gray-400 overflow-x-auto">{ep.code}</pre>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* CRE Webhooks */}
-                            <h3 className="text-lg font-semibold text-white mb-4 mt-8">CRE Webhook Endpoints</h3>
-                            <p className="text-gray-400 text-sm mb-4">These endpoints are called by CRE workflows during the automated settlement/dispute lifecycle.</p>
-                            {[
-                                {
-                                    method: 'GET', color: 'green', path: '/cre/verify-delivery/:escrowKey',
-                                    desc: 'CRE Settlement Verifier checks whether the resource was delivered.',
-                                    code: `{ "delivered": true, "escrowKey": "0xabc...", "transactionId": "tx_123" }`,
-                                },
-                                {
-                                    method: 'GET', color: 'green', path: '/cre/analyze-dispute/:escrowKey',
-                                    desc: 'CRE Dispute Resolver runs AI analysis for a disputed escrow.',
-                                    code: `{ "payMerchant": false, "confidence": 0.87, "reasoning": "Mismatch in description" }`,
-                                },
-                                {
-                                    method: 'GET', color: 'green', path: '/cre/dispute-context/:escrowKey',
-                                    desc: 'Returns dispute context (resource + reason) for AI workflows.',
-                                    code: `{ "escrowKey": "0xabc...", "title": "My Dataset", "disputeReason": "..." }`,
-                                },
-                                {
-                                    method: 'GET', color: 'green', path: '/cre/expired-escrows',
-                                    desc: 'CRE Expiry Watchdog fetches escrows past their expiry window.',
-                                    code: `{ "expired": [{ "escrowKey": "0xabc...", "transactionId": "tx_123" }], "count": 1 }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/cre/settlement-complete',
-                                    desc: 'CRE notifies backend after finalizing settlement on-chain.',
-                                    code: `{ "escrowKey": "0xabc...", "txHash": "0x123..." }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/cre/dispute-resolved',
-                                    desc: 'CRE notifies backend after resolving a dispute on-chain.',
-                                    code: `{ "escrowKey": "0xabc...", "txHash": "0x123...", "payMerchant": false }`,
-                                },
-                                {
-                                    method: 'GET', color: 'green', path: '/cre/active-workflows',
-                                    desc: 'Workflow engine fetches all ACTIVE merchant workflows.',
-                                    code: `{ "workflows": [{ "id": "wf_123", "schedule": "FREQ=HOURLY" }] }`,
-                                },
-                                {
-                                    method: 'POST', color: 'purple', path: '/cre/workflow-action',
-                                    desc: 'Workflow engine triggers an action (update price, toggle resource).',
-                                    code: `{ "action": "update_price", "resourceId": "abc123", "value": 0.003 }`,
-                                },
-                            ].map((ep) => (
-                                <div key={ep.path} className="bg-[#111] rounded-2xl border border-white/10 p-6 mb-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className={`px-2 py-1 text-xs font-mono rounded ${ep.method === 'GET' ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>{ep.method}</span>
-                                        <code className="text-white font-mono text-sm">{ep.path}</code>
-                                    </div>
-                                    <p className="text-gray-400 text-sm mb-3">{ep.desc}</p>
-                                    <div className="bg-black rounded-lg p-4">
-                                        <pre className="text-sm text-gray-400 overflow-x-auto">{ep.code}</pre>
-                                    </div>
-                                </div>
-                            ))}
+                            </div>
                         </section>
 
-                        {/* 8. Roadmap & Next Steps */}
+                        {/* 9. Roadmap & Next Steps */}
                         <section id="future" className="mb-20">
                             <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">8</span>
+                                <span className="w-8 h-8 bg-[#375BD2]/20 rounded-lg flex items-center justify-center text-[#375BD2] text-sm font-bold">9</span>
                                 Roadmap & Next Steps
                             </h2>
                             <div className="space-y-4">
