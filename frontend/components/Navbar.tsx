@@ -9,7 +9,7 @@ export default function Navbar() {
 
     return (
         <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-            <div className="backdrop-blur-md bg-black/40 border border-white/10 rounded-full pl-1 pr-8 py-1 shadow-xl shadow-black/20">
+            <div className="backdrop-blur-md bg-[#020A20]/60 border border-white/10 rounded-full pl-1 pr-8 py-1 shadow-xl shadow-black/20">
                 <div className="flex items-center gap-8">
                     {/* Logo */}
                     <Link href="/" className="flex items-center">
@@ -34,7 +34,7 @@ export default function Navbar() {
 
                     {/* CTA Button */}
                     <div className="hidden md:flex items-center">
-                        <Link href="/dashboard" className="px-6 py-2.5 bg-[#375BD2] hover:bg-[#2A4AB0] text-white font-medium rounded-full transition-colors text-sm">
+                        <Link href="/dashboard" className="px-6 py-2.5 bg-[#2D50A2] hover:bg-[#132A63] text-white font-medium rounded-full transition-colors text-sm">
                             Build with Chainlink Agent
                         </Link>
                     </div>
@@ -65,7 +65,7 @@ export default function Navbar() {
                                 Demo
                             </Link>
                             <div className="flex flex-col gap-2 mt-2">
-                                <Link href="/dashboard" className="px-8 py-3 bg-[#375BD2] hover:bg-[#2A4AB0] text-white font-semibold rounded-full transition-colors text-sm text-center">
+                                <Link href="/dashboard" className="px-8 py-3 bg-[#2D50A2] hover:bg-[#132A63] text-white font-semibold rounded-full transition-colors text-sm text-center">
                                     Build with Chainlink Agent
                                 </Link>
                             </div>

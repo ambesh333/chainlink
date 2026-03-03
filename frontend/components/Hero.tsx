@@ -4,11 +4,11 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 // Inline SVG avatars — no external dependency needed
-const AVATAR_COLORS = ['#375BD2', '#7C3AED', '#0EA5E9', '#10B981'];
+const AVATAR_COLORS = ['#2D50A2', '#132A63', '#041A54', '#0D1B39'];
 function AvatarCircle({ color, letter }: { color: string; letter: string }) {
     return (
         <div
-            className="w-8 h-8 rounded-full border-2 border-[#030712] flex items-center justify-center text-white text-xs font-bold"
+            className="w-8 h-8 rounded-full border-2 border-[#020A20] flex items-center justify-center text-white text-xs font-bold"
             style={{ background: color }}
         >
             {letter}
@@ -24,7 +24,7 @@ const AVATARS = [
 
 export default function Hero() {
     return (
-        <section className="relative min-h-screen flex flex-col overflow-hidden bg-[#030712]">
+        <section className="relative min-h-screen flex flex-col overflow-hidden bg-[#020A20]">
 
             {/* ── Banner image sits in the bottom half ── */}
             <div className="absolute inset-0">
@@ -38,13 +38,13 @@ export default function Hero() {
                     style={{ opacity: 0.85 }}
                 />
                 {/* top dark fade so text stays readable */}
-                <div className="absolute inset-0 bg-gradient-to-b from-[#030712] via-[#030712]/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-b from-[#020A20] via-[#020A20]/60 to-transparent" />
                 {/* subtle blue radial glow at centre-top */}
                 <div
                     className="absolute inset-0"
                     style={{
                         background:
-                            'radial-gradient(ellipse 70% 40% at 50% 10%, rgba(55,91,210,0.18) 0%, transparent 70%)',
+                            'radial-gradient(ellipse 70% 40% at 50% 10%, rgba(45,80,162,0.22) 0%, transparent 70%)',
                     }}
                 />
             </div>
@@ -100,7 +100,7 @@ export default function Hero() {
             </div>
 
             {/* bottom vignette so the arc blends into the next section */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#030712] to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#020A20] to-transparent pointer-events-none" />
         </section>
     );
 }

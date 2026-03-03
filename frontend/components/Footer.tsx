@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function Footer() {
     return (
-        <footer className="bg-black">
+        <footer className="bg-[#020A20]">
             {/* Banner Image */}
             <div className="w-full">
                 <img
@@ -20,7 +20,7 @@ export default function Footer() {
                     {/* Brand */}
                     <div className="md:col-span-1">
                         <Link href="/" className="flex items-center gap-2 mb-4">
-                            <span className="text-2xl font-bold bg-gradient-to-r from-[#375BD2] to-[#4C8BF5] bg-clip-text text-transparent">
+                            <span className="text-2xl font-bold bg-gradient-to-r from-[#2D50A2] to-[#041A54] bg-clip-text text-transparent">
                                 CA
                             </span>
                         </Link>

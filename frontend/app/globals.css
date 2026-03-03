@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0e1a;
+  --background: #020A20;
   --foreground: rgba(255, 255, 255, 0.9);
-  --color-background: #0a0e1a;
+  --color-background: #020A20;
   --color-foreground: #e0e6f0;
-  --color-primary: #375BD2;
-  --color-primary-hover: #2A4AB0;
-  --color-accent: #4C8BF5;
-  --color-surface: #111827;
-  --color-surface-elevated: #1a2235;
+  --color-primary: #2D50A2;
+  --color-primary-hover: #132A63;
+  --color-accent: #041A54;
+  --color-surface: #040914;
+  --color-surface-elevated: #060E1F;
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }
@@ -38,21 +38,21 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(55, 91, 210, 0.3);
+  background: rgba(45, 80, 162, 0.3);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(55, 91, 210, 0.5);
+  background: rgba(45, 80, 162, 0.5);
 }
 
 /* Custom gradient utilities */
 .bg-cool-gradient {
-  background: linear-gradient(to right, #000000, #050a1a, #0a1228, #1a2a6e);
+  background: linear-gradient(to right, #020515, #020A20, #031030, #2D50A2);
 }
 
 .text-gradient-blue {
-  background: linear-gradient(to right, #375BD2, #4C8BF5);
+  background: linear-gradient(to right, #2D50A2, #041A54);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -121,7 +121,7 @@ body {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(55, 91, 210, 0.3), transparent 50%, rgba(76, 139, 245, 0.2));
+  background: linear-gradient(135deg, rgba(45, 80, 162, 0.3), transparent 50%, rgba(4, 26, 84, 0.25));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -136,5 +136,5 @@ body {
 
 .feature-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 40px -12px rgba(55, 91, 210, 0.15);
+  box-shadow: 0 20px 40px -12px rgba(45, 80, 162, 0.18);
 }
