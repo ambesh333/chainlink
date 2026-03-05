@@ -10,6 +10,7 @@ import { prisma } from '../context';
 import { getEscrowOnChain, EscrowState } from '../clients/escrowClient';
 import { analyzeDispute, AnalysisInput } from '../services/aiDisputeService';
 import { sendTelegramMessage, interpolateTemplate } from '../services/telegramService';
+import { executePrivateSettlement } from '../services/privateSettlementService';
 
 const router = Router();
 
@@ -193,10 +194,21 @@ router.post('/dispute-resolved', async (req, res) => {
 
         console.log(`[CRE] Dispute resolved for escrow=${escrowKey}, payMerchant=${payMerchant}, status=${finalStatus}`);
 
+        // If merchant wins, trigger private token transfer (idempotent)
+        let privateTransferTxId: string | null = null;
+        if (payMerchant) {
+            try {
+                privateTransferTxId = await executePrivateSettlement(escrowKey);
+            } catch (err: any) {
+                console.warn(`[CRE] Private settlement after dispute failed (non-fatal): ${err.message}`);
+            }
+        }
+
         return res.json({
             success: true,
             transactionId: updated.id,
             status: updated.status,
+            privateTransferTxId,
         });
     } catch (error) {
         console.error('[CRE] Dispute resolved error:', error);
@@ -244,14 +256,89 @@ router.post('/settlement-complete', async (req, res) => {
 
         console.log(`[CRE] Settlement complete for escrow=${escrowKey}, txHash=${txHash || 'n/a'}`);
 
+        // Auto-trigger private token transfer (idempotent — safe to call multiple times)
+        let privateTransferTxId: string | null = null;
+        try {
+            privateTransferTxId = await executePrivateSettlement(escrowKey);
+        } catch (err: any) {
+            console.warn(`[CRE] Private settlement failed (non-fatal): ${err.message}`);
+        }
+
         return res.json({
             success: true,
             transactionId: updated.id,
             status: updated.status,
+            privateTransferTxId,
         });
     } catch (error) {
         console.error('[CRE] Settlement complete error:', error);
         return res.status(500).json({ error: 'Failed to update settlement status' });
+    }
+});
+
+/**
+ * POST /api/cre/private-settle
+ *
+ * Triggers a private token transfer for a settled escrow.
+ * Called by the CRE settlement-verifier workflow after on-chain settlement.
+ * Idempotent: returns existing txId if already completed.
+ *
+ * Body: { escrowKey }
+ */
+router.post('/private-settle', async (req, res) => {
+    try {
+        const { escrowKey } = req.body;
+
+        if (!escrowKey) {
+            return res.status(400).json({ error: 'escrowKey is required' });
+        }
+
+        const txId = await executePrivateSettlement(escrowKey);
+
+        return res.json({
+            success: true,
+            escrowKey,
+            privateTransferTxId: txId,
+            message: txId
+                ? `Private transfer complete: ${txId}`
+                : 'Private transfer not applicable (missing shielded address or config)',
+        });
+    } catch (error: any) {
+        console.error('[CRE] Private settle error:', error);
+        return res.status(500).json({ error: 'Private settlement failed', message: error.message });
+    }
+});
+
+/**
+ * GET /api/cre/verify-private-transfer/:escrowKey
+ *
+ * Verifies that a private token transfer was executed for a given escrow.
+ * Returns the privateTransferTxId if it exists.
+ */
+router.get('/verify-private-transfer/:escrowKey', async (req, res) => {
+    try {
+        const { escrowKey } = req.params;
+
+        const transaction = await prisma.transaction.findFirst({
+            where: { paymentTransactionId: escrowKey },
+            select: { id: true, status: true, privateTransferTxId: true },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'No transaction found for this escrow key' });
+        }
+
+        return res.json({
+            escrowKey,
+            transactionId: transaction.id,
+            status: transaction.status,
+            privateTransferTxId: transaction.privateTransferTxId || null,
+            verified: !!transaction.privateTransferTxId,
+        });
+    } catch (error) {
+        console.error('[CRE] Verify private transfer error:', error);
+        return res.status(500).json({ error: 'Failed to verify private transfer' });
     }
 });
 
@@ -308,6 +395,57 @@ router.get('/verify-delivery/:escrowKey', async (req, res) => {
     } catch (error) {
         console.error('[CRE] Verify delivery error:', error);
         return res.status(500).json({ error: 'Failed to verify delivery' });
+    }
+});
+
+/**
+ * POST /api/cre/expiry-refunded
+ *
+ * Called by the CRE expiry-watchdog workflow after refunding an expired escrow.
+ * Updates DB: PENDING → REFUNDED. No private transfer needed (agent gets on-chain refund).
+ */
+router.post('/expiry-refunded', async (req, res) => {
+    try {
+        const { escrowKey, txHash } = req.body;
+
+        if (!escrowKey) {
+            return res.status(400).json({ error: 'escrowKey is required' });
+        }
+
+        const transaction = await prisma.transaction.findFirst({
+            where: { paymentTransactionId: escrowKey },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!transaction) {
+            return res.status(404).json({ error: 'No transaction found for this escrow key' });
+        }
+
+        if (transaction.status === 'REFUNDED' || transaction.status === 'SETTLED') {
+            return res.json({
+                success: true,
+                message: `Transaction already in state: ${transaction.status}`,
+            });
+        }
+
+        const updated = await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: {
+                status: 'REFUNDED',
+                ...(txHash ? { settlementTxHash: txHash } : {}),
+            },
+        });
+
+        console.log(`[CRE] Expiry refund for escrow=${escrowKey}, txHash=${txHash || 'n/a'}`);
+
+        return res.json({
+            success: true,
+            transactionId: updated.id,
+            status: updated.status,
+        });
+    } catch (error) {
+        console.error('[CRE] Expiry refunded error:', error);
+        return res.status(500).json({ error: 'Failed to update expiry refund status' });
     }
 });
 

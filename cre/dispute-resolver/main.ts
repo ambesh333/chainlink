@@ -155,13 +155,65 @@ const onDisputeRaised = (
         multiHeaders: {
           "Content-Type": { values: ["application/json"] },
         },
-        body: { value: notifyPayload, case: "bodyString" as const },
+        bodyString: notifyPayload,
       },
     }).result();
 
     runtime.log(`Backend notified: dispute-resolved for ${escrowKey}`);
   } catch {
     runtime.log(`Warning: failed to notify backend for ${escrowKey}`);
+  }
+
+  // ─────────────────────────────────────
+  // 5️⃣ If merchant wins → trigger private token transfer
+  // ─────────────────────────────────────
+  if (payMerchant) {
+    try {
+      const privateSettlePayload = JSON.stringify({ escrowKey });
+
+      const privateSettleResponse = confidentialHttp.sendRequest(runtime, {
+        request: {
+          url: `${config.backendUrl}/cre/private-settle`,
+          method: "POST",
+          multiHeaders: {
+            "Content-Type": { values: ["application/json"] },
+          },
+          bodyString: privateSettlePayload,
+        },
+      }).result();
+
+      const privateBody = new TextDecoder().decode(privateSettleResponse.body);
+      runtime.log(
+        `Private settlement triggered: status=${privateSettleResponse.statusCode} body=${privateBody}`
+      );
+    } catch {
+      runtime.log(`Warning: failed to trigger private settlement for ${escrowKey}`);
+    }
+
+    // ─────────────────────────────────────
+    // 6️⃣ Verify private transfer completed
+    // ─────────────────────────────────────
+    try {
+      const verifyPrivateResponse = confidentialHttp.sendRequest(runtime, {
+        request: {
+          url: `${config.backendUrl}/cre/verify-private-transfer/${escrowKey}`,
+          method: "GET",
+          multiHeaders: {
+            "Content-Type": { values: ["application/json"] },
+          },
+        },
+      }).result();
+
+      const verifyBody = new TextDecoder().decode(verifyPrivateResponse.body);
+      const verifyResult = JSON.parse(verifyBody);
+      runtime.log(
+        `Private transfer verified=${verifyResult.verified}, txId=${verifyResult.privateTransferTxId || "n/a"}`
+      );
+    } catch {
+      runtime.log(`Warning: failed to verify private transfer for ${escrowKey}`);
+    }
+  } else {
+    runtime.log(`Agent refunded — no private transfer needed for ${escrowKey}`);
   }
 
   return `Resolved ${escrowKey} → payMerchant=${payMerchant} | txHash=${finalTxHash}`;

@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAuth } from './AuthContext';
@@ -6,7 +7,9 @@ import { Loader2, LogOut, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function ConnectWalletButton() {
     const { isConnected } = useAccount();
-    const { user, isLoading, isAuthenticated, signIn, signOut, error } = useAuth();
+    const { user, isLoading, isAuthenticated, signIn, signOut, generateShieldedAddress, error } = useAuth();
+    const [shieldedLoading, setShieldedLoading] = useState(false);
+    const [shieldedError, setShieldedError] = useState<string | null>(null);
 
     // Not connected to wallet yet — show RainbowKit connect button
     if (!isConnected) {
@@ -50,6 +53,42 @@ export function ConnectWalletButton() {
                 </p>
                 <p className="text-xs text-gray-400">Connected</p>
             </div>
+
+            {!user?.shieldedAddress ? (
+                <div className="flex flex-col items-end gap-1">
+                    <button
+                        onClick={async () => {
+                            try {
+                                setShieldedLoading(true);
+                                setShieldedError(null);
+                                await generateShieldedAddress();
+                            } catch (err: any) {
+                                setShieldedError(err?.message || 'Failed to generate shielded address');
+                            } finally {
+                                setShieldedLoading(false);
+                            }
+                        }}
+                        disabled={shieldedLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-full text-sm text-white transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                        {shieldedLoading ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" /> Generating...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle size={16} /> Generate Shielded Address
+                            </>
+                        )}
+                    </button>
+                    {shieldedError && (
+                        <div className="flex items-center gap-1 text-red-400 text-xs">
+                            <AlertCircle size={12} /> {shieldedError}
+                        </div>
+                    )}
+                </div>
+            ) : null}
+
             <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-full text-sm text-white transition-colors cursor-pointer"

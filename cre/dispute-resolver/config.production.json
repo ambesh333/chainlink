@@ -1,6 +1,6 @@
 {
   "escrowContractAddress": "0x182aB561564Ef0f16571Aba90c60993DE5aEcA04",
   "disputeConsumerAddress": "0x9Ca2f89Af2a96B49a755d8047449f2aA3946b1D9",
-  "backendUrl": "http://localhost:3001/api",
+  "backendUrl": "https://chainlink-yqcy.onrender.com/api",
   "chainName": "ethereum-testnet-sepolia"
 }

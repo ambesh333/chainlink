@@ -7,6 +7,31 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const NONCE_EXPIRY_MINUTES = 5;
 const JWT_EXPIRY = '7d';
+const PRIVATE_TOKEN_API_URL = process.env.PRIVATE_TOKEN_API_URL || 'https://convergence2026-token-api.cldev.cloud';
+const FACILITATOR_PRIVATE_KEY = process.env.FACILITATOR_PRIVATE_KEY || '';
+const FACILITATOR_SHIELDED_ADDRESS = process.env.FACILITATOR_SHIELDED_ADDRESS || '';
+const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS || '';
+const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+
+async function requestShieldedAddress(params: { account: string; timestamp: number; auth: string }): Promise<string> {
+    const response = await fetch(`${PRIVATE_TOKEN_API_URL}/shielded-address`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+    });
+
+    const data: any = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error_details || data.error || `Private Token API error: ${response.statusText}`);
+    }
+
+    if (!data.address) {
+        throw new Error('Shielded address missing in API response');
+    }
+
+    return data.address as string;
+}
 
 // GET /api/auth/me - Check session
 export const getMe = async (req: Request, res: Response) => {
@@ -31,7 +56,8 @@ export const getMe = async (req: Request, res: Response) => {
             user: {
                 id: user.id,
                 walletAddress: user.walletAddress,
-                displayName: user.displayName
+                displayName: user.displayName,
+                shieldedAddress: user.shieldedAddress
             }
         });
     } catch (error) {
@@ -184,6 +210,7 @@ export const verifySignature = async (req: Request, res: Response) => {
                 id: user.id,
                 walletAddress: user.walletAddress,
                 displayName: user.displayName,
+                shieldedAddress: user.shieldedAddress,
                 isNewUser: !user.displayName
             },
             token // Return token for client-side storage (fallback for cross-site cookies)
@@ -191,6 +218,204 @@ export const verifySignature = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Verification error:', error);
         return res.status(500).json({ error: 'Verification failed' });
+    }
+};
+
+// POST /api/auth/shielded-address - Store user's shielded address
+export const setShieldedAddress = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).userId as string | undefined;
+        const walletAddress = (req as any).walletAddress as string | undefined;
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const { shieldedAddress, auth, timestamp } = req.body as {
+            shieldedAddress?: string;
+            auth?: string;
+            timestamp?: number | string;
+        };
+
+        let finalShieldedAddress = shieldedAddress;
+        if (!finalShieldedAddress) {
+            if (!walletAddress) {
+                return res.status(400).json({ error: 'Wallet address missing from session' });
+            }
+            if (!auth || typeof auth !== 'string') {
+                return res.status(400).json({ error: 'auth is required' });
+            }
+            const tsNumber = typeof timestamp === 'string' ? Number(timestamp) : timestamp;
+            if (!tsNumber || Number.isNaN(tsNumber)) {
+                return res.status(400).json({ error: 'timestamp is required' });
+            }
+
+            finalShieldedAddress = await requestShieldedAddress({
+                account: walletAddress,
+                timestamp: tsNumber,
+                auth,
+            });
+        }
+
+        let checksumAddress: string;
+        try {
+            checksumAddress = ethers.getAddress(finalShieldedAddress);
+        } catch {
+            return res.status(400).json({ error: 'Invalid Ethereum address' });
+        }
+
+        const user = await prisma.user.update({
+            where: { id: userId },
+            data: { shieldedAddress: checksumAddress }
+        });
+
+        return res.json({
+            success: true,
+            user: {
+                id: user.id,
+                walletAddress: user.walletAddress,
+                displayName: user.displayName,
+                shieldedAddress: user.shieldedAddress
+            }
+        });
+    } catch (error) {
+        console.error('Set shielded address error:', error);
+        return res.status(500).json({ error: 'Failed to save shielded address' });
+    }
+};
+
+// POST /api/auth/private-balance - Fetch user's private token balance via signed auth
+export const getPrivateBalance = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).userId as string | undefined;
+        const walletAddress = (req as any).walletAddress as string | undefined;
+        if (!userId || !walletAddress) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const { auth, timestamp } = req.body as {
+            auth?: string;
+            timestamp?: number | string;
+        };
+
+        if (!auth || typeof auth !== 'string') {
+            return res.status(400).json({ error: 'auth is required' });
+        }
+
+        const tsNumber = typeof timestamp === 'string' ? Number(timestamp) : timestamp;
+        if (!tsNumber || Number.isNaN(tsNumber)) {
+            return res.status(400).json({ error: 'timestamp is required' });
+        }
+
+        const response = await fetch(`${PRIVATE_TOKEN_API_URL}/balances`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account: walletAddress,
+                timestamp: tsNumber,
+                auth,
+            }),
+        });
+
+        const data: any = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.error_details || data.error || `Private Token API error: ${response.statusText}`);
+        }
+
+        const balances: Array<{ token: string; amount: string }> = Array.isArray(data.balances) ? data.balances : [];
+        const tokenAddress = (process.env.TOKEN_ADDRESS || '').toLowerCase();
+        const match = tokenAddress
+            ? balances.find(b => b.token?.toLowerCase() === tokenAddress)
+            : balances[0];
+
+        const balanceWei = match?.amount || '0';
+        const balance = ethers.formatUnits(balanceWei, 18);
+
+        return res.json({
+            account: walletAddress,
+            token: match?.token || (tokenAddress ? `0x${tokenAddress.slice(2)}` : null),
+            balanceWei,
+            balance,
+        });
+    } catch (error: any) {
+        console.error('Private balance error:', error?.message || error);
+        return res.status(500).json({ error: 'Failed to fetch private balance', message: error?.message });
+    }
+};
+
+// POST /api/auth/withdraw-eth - Convert private CLAG balance to ETH payout
+export const withdrawToEth = async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).userId as string | undefined;
+        const walletAddress = (req as any).walletAddress as string | undefined;
+        if (!userId || !walletAddress) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        if (!FACILITATOR_PRIVATE_KEY || !FACILITATOR_SHIELDED_ADDRESS || !TOKEN_ADDRESS) {
+            return res.status(500).json({ error: 'Facilitator payout config missing' });
+        }
+
+        const { auth, timestamp, amount } = req.body as {
+            auth?: string;
+            timestamp?: number | string;
+            amount?: string;
+        };
+
+        if (!auth || typeof auth !== 'string') {
+            return res.status(400).json({ error: 'auth is required' });
+        }
+
+        const tsNumber = typeof timestamp === 'string' ? Number(timestamp) : timestamp;
+        if (!tsNumber || Number.isNaN(tsNumber)) {
+            return res.status(400).json({ error: 'timestamp is required' });
+        }
+
+        if (!amount || typeof amount !== 'string') {
+            return res.status(400).json({ error: 'amount is required' });
+        }
+
+        // 1) Private transfer from merchant -> treasury shielded address
+        const transferRes = await fetch(`${PRIVATE_TOKEN_API_URL}/private-transfer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account: walletAddress,
+                recipient: FACILITATOR_SHIELDED_ADDRESS,
+                token: TOKEN_ADDRESS,
+                amount,
+                flags: [],
+                timestamp: tsNumber,
+                auth,
+            }),
+        });
+
+        const transferData: any = await transferRes.json().catch(() => ({}));
+        if (!transferRes.ok) {
+            throw new Error(transferData.error_details || transferData.error || `Private transfer failed`);
+        }
+
+        const privateTransferTxId = transferData.transaction_id as string | undefined;
+
+        // 2) Send ETH payout (1:1 with CLAG for now)
+        const provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
+        const facilitatorWallet = new ethers.Wallet(FACILITATOR_PRIVATE_KEY, provider);
+        const value = BigInt(amount);
+
+        const tx = await facilitatorWallet.sendTransaction({
+            to: walletAddress,
+            value,
+        });
+
+        return res.json({
+            success: true,
+            privateTransferTxId,
+            ethTxHash: tx.hash,
+            amountWei: amount,
+        });
+    } catch (error: any) {
+        console.error('Withdraw to ETH error:', error?.message || error);
+        return res.status(500).json({ error: 'Withdraw to ETH failed', message: error?.message });
     }
 };
 

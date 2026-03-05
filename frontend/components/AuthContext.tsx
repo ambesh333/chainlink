@@ -1,12 +1,13 @@
 'use client';
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
-import { getApiUrl } from '@/lib/config';
+import { useAccount, useSignMessage, useSignTypedData, useDisconnect } from 'wagmi';
+import { getApiUrl, getVaultAddress } from '@/lib/config';
 
 interface User {
     id: string;
     walletAddress: string;
     displayName: string | null;
+    shieldedAddress?: string | null;
     isNewUser?: boolean;
 }
 
@@ -16,6 +17,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
+    generateShieldedAddress: () => Promise<void>;
     getToken: () => string | null;
     error: string | null;
 }
@@ -25,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const { address, isConnected } = useAccount();
     const { signMessageAsync } = useSignMessage();
+    const { signTypedDataAsync } = useSignTypedData();
     const { disconnect } = useDisconnect();
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -135,7 +138,65 @@ Issued At: ${issuedAt}`;
         } finally {
             setIsLoading(false);
         }
-    }, [address, isConnected, signMessageAsync]);
+    }, [address, isConnected, signMessageAsync, signTypedDataAsync]);
+
+    const ensureShieldedAddress = async (currentUser: User) => {
+        if (!address || !isConnected) return;
+        if (currentUser.shieldedAddress) return;
+
+        try {
+            const API_URL = getApiUrl();
+            const VAULT_ADDRESS = getVaultAddress();
+
+            const timestamp = Math.floor(Date.now() / 1000);
+            const domain = {
+                name: 'CompliantPrivateTokenDemo',
+                version: '0.0.1',
+                chainId: 11155111,
+                verifyingContract: VAULT_ADDRESS,
+            } as const;
+
+            const types = {
+                'Generate Shielded Address': [
+                    { name: 'account', type: 'address' },
+                    { name: 'timestamp', type: 'uint256' },
+                ],
+            } as const;
+
+            const auth = await signTypedDataAsync({
+                domain,
+                types,
+                primaryType: 'Generate Shielded Address',
+                message: {
+                    account: address as `0x${string}`,
+                    timestamp: BigInt(timestamp),
+                },
+            });
+
+            const saveRes = await fetch(`${API_URL}/auth/shielded-address`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ timestamp, auth }),
+            });
+
+            const saveData = await saveRes.json().catch(() => ({}));
+            if (!saveRes.ok) {
+                throw new Error(saveData.error || 'Failed to save shielded address');
+            }
+
+            if (saveData.user) {
+                setUser(saveData.user);
+            }
+        } catch (err) {
+            console.warn('[Auth] Shielded address generation failed:', err);
+        }
+    };
+
+    const generateShieldedAddress = useCallback(async () => {
+        if (!user) return;
+        await ensureShieldedAddress(user);
+    }, [user, address, isConnected, signTypedDataAsync]);
 
     const signOut = useCallback(async () => {
         try {
@@ -160,6 +221,7 @@ Issued At: ${issuedAt}`;
             isAuthenticated: !!user,
             signIn,
             signOut,
+            generateShieldedAddress,
             getToken: () => typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null,
             error
         }}>

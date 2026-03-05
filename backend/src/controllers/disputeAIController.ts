@@ -8,6 +8,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../context';
 import { analyzeDispute, AnalysisInput } from '../services/aiDisputeService';
 import { finalizeSettlementOnChain, getEscrowOnChain, EscrowState } from '../clients/escrowClient';
+import { executePrivateSettlement } from '../services/privateSettlementService';
 
 /**
  * POST /api/disputes/:transactionId/ai-analyze
@@ -216,10 +217,21 @@ export const resolveAIDispute = async (req: Request, res: Response) => {
             data: { status: finalStatus }
         });
 
+        // If merchant wins (REJECT), trigger private token transfer
+        let privateTransferTxId: string | null = null;
+        if (finalStatus === 'SETTLED' && escrowKey) {
+            try {
+                privateTransferTxId = await executePrivateSettlement(escrowKey);
+            } catch (err: any) {
+                console.warn(`[Dispute] Private settlement failed (non-fatal): ${err.message}`);
+            }
+        }
+
         return res.json({
             success: true,
             status: updatedTx.status,
             onChainTx: onChainTxHash,
+            privateTransferTxId,
             message: decision === 'APPROVE'
                 ? 'Dispute approved. Refund sent to agent.'
                 : 'Dispute rejected. Funds released to merchant.'
@@ -247,6 +259,10 @@ export const getDisputes = async (req: Request, res: Response) => {
         const disputes = await prisma.transaction.findMany({
             where: {
                 userId,
+                OR: [
+                    { status: 'REFUND_REQUESTED' },
+                    { encryptedDisputeReason: { not: null } }
+                ],
                 status: { in: ['REFUND_REQUESTED', 'SETTLED', 'REFUNDED'] }
             },
             include: {

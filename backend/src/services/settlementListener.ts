@@ -13,6 +13,7 @@ import {
     finalizeSettlementOnChain,
     EscrowState,
 } from '../clients/escrowClient';
+import { executePrivateSettlement } from './privateSettlementService';
 import EscrowMarketplaceABI from '../contracts/EscrowMarketplaceABI.json';
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
@@ -86,6 +87,13 @@ async function handleSettlementRequested(key: string, agent: string): Promise<vo
         });
 
         console.log(`${tag} Transaction ${transaction.id} updated to SETTLED`);
+
+        // Trigger private token transfer (idempotent fallback)
+        try {
+            await executePrivateSettlement(key);
+        } catch (ptErr: any) {
+            console.warn(`${tag} Private settlement failed (non-fatal): ${ptErr.message}`);
+        }
     } catch (error: any) {
         console.error(`${tag} Error processing escrow key=${key.slice(0, 18)}...:`, error.message);
     }

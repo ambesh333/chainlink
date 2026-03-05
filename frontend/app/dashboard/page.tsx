@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Package, TrendingUp, Zap, Shield, Loader2, Wallet, CheckCircle, Clock, Image, Video, ExternalLink, Bot, ArrowLeft, ArrowUpRight, Link2, ArrowDownLeft, ArrowUpFromLine, AlertTriangle, Activity } from 'lucide-react';
+import { parseUnits } from 'viem';
+import { useAccount, useSignTypedData } from 'wagmi';
 import { useAuth } from '@/components/AuthContext';
-import { getApiUrl } from '@/lib/config';
+import { getApiUrl, getVaultAddress, getTokenAddress, getFacilitatorShieldedAddress } from '@/lib/config';
 
 interface DashboardStats {
     totalResources: number;
@@ -11,8 +13,6 @@ interface DashboardStats {
     totalTransactions: number;
     revenue: string;
     pendingDisputes: number;
-    trustScore: number;
-    trustLabel: string;
     recentTransactions: RecentTransaction[];
 }
 
@@ -77,7 +77,9 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function DashboardPage() {
-    const { getToken } = useAuth();
+    const { getToken, user } = useAuth();
+    const { address, isConnected } = useAccount();
+    const { signTypedDataAsync } = useSignTypedData();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [earnings, setEarnings] = useState<ResourceEarning[]>([]);
@@ -89,6 +91,13 @@ export default function DashboardPage() {
     const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
     const [activeTab, setActiveTab] = useState<TabKey>('transactions');
     const [visible, setVisible] = useState(false);
+    const [privateBalance, setPrivateBalance] = useState<string | null>(null);
+    const [privateBalanceLoading, setPrivateBalanceLoading] = useState(false);
+    const [privateBalanceError, setPrivateBalanceError] = useState<string | null>(null);
+    const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+    const [withdrawLoading, setWithdrawLoading] = useState(false);
+    const [withdrawError, setWithdrawError] = useState<string | null>(null);
+    const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
 
     // Trigger animations once data is loaded
     useEffect(() => {
@@ -179,6 +188,12 @@ export default function DashboardPage() {
         return () => clearInterval(interval);
     }, [disputes]);
 
+    useEffect(() => {
+        if (privateBalance && !withdrawAmount) {
+            setWithdrawAmount(privateBalance);
+        }
+    }, [privateBalance, withdrawAmount]);
+
     const getTypeIcon = (type: string) => {
         switch (type) {
             case 'IMAGE': return <Image size={16} className="text-[#375BD2]" />;
@@ -191,8 +206,6 @@ export default function DashboardPage() {
     const activeResources = stats?.activeResources ?? 0;
     const totalTransactions = stats?.totalTransactions ?? 0;
     const pendingDisputes = stats?.pendingDisputes ?? 0;
-    const trustScore = stats?.trustScore ?? 0;
-    const trustLabel = stats?.trustLabel ?? 'N/A';
     const recentTransactions = stats?.recentTransactions ?? [];
 
     const activePercent = totalResources > 0 ? Math.round((activeResources / totalResources) * 100) : 0;
@@ -204,6 +217,149 @@ export default function DashboardPage() {
             </div>
         );
     }
+
+    const formatPrivateBalance = (value: string | null) => {
+        if (!value) return '—';
+        const [whole, frac = ''] = value.split('.');
+        const trimmed = frac.slice(0, 5).padEnd(5, '0');
+        return `${whole}.${trimmed}`;
+    };
+
+    const fetchPrivateBalance = async () => {
+        if (!address || !isConnected) {
+            setPrivateBalanceError('Connect your wallet to view balance');
+            return;
+        }
+
+        try {
+            setPrivateBalanceLoading(true);
+            setPrivateBalanceError(null);
+
+            const API_URL = getApiUrl();
+            const VAULT_ADDRESS = getVaultAddress();
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            const domain = {
+                name: 'CompliantPrivateTokenDemo',
+                version: '0.0.1',
+                chainId: 11155111,
+                verifyingContract: VAULT_ADDRESS,
+            } as const;
+
+            const types = {
+                'Retrieve Balances': [
+                    { name: 'account', type: 'address' },
+                    { name: 'timestamp', type: 'uint256' },
+                ],
+            } as const;
+
+            const auth = await signTypedDataAsync({
+                domain,
+                types,
+                primaryType: 'Retrieve Balances',
+                message: {
+                    account: address as `0x${string}`,
+                    timestamp: BigInt(timestamp),
+                },
+            });
+
+            const res = await fetch(`${API_URL}/auth/private-balance`, {
+                method: 'POST',
+                headers: getHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ timestamp, auth }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to fetch private balance');
+            }
+
+            setPrivateBalance(data.balance || '0');
+        } catch (err: any) {
+            setPrivateBalanceError(err?.message || 'Failed to fetch private balance');
+        } finally {
+            setPrivateBalanceLoading(false);
+        }
+    };
+
+    const withdrawToEth = async () => {
+        if (!address || !isConnected) {
+            setWithdrawError('Connect your wallet to withdraw');
+            return;
+        }
+        if (!user?.shieldedAddress) {
+            setWithdrawError('Generate a shielded address first');
+            return;
+        }
+        if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+            setWithdrawError('Enter a valid amount');
+            return;
+        }
+
+        try {
+            setWithdrawLoading(true);
+            setWithdrawError(null);
+            setWithdrawTxHash(null);
+
+            const API_URL = getApiUrl();
+            const VAULT_ADDRESS = getVaultAddress();
+            const TOKEN_ADDRESS = getTokenAddress();
+            const TREASURY_SHIELDED = getFacilitatorShieldedAddress();
+            const timestamp = Math.floor(Date.now() / 1000);
+            const amountWei = parseUnits(withdrawAmount as `${string}`, 18).toString();
+
+            const domain = {
+                name: 'CompliantPrivateTokenDemo',
+                version: '0.0.1',
+                chainId: 11155111,
+                verifyingContract: VAULT_ADDRESS,
+            } as const;
+
+            const types = {
+                'Private Token Transfer': [
+                    { name: 'sender', type: 'address' },
+                    { name: 'recipient', type: 'address' },
+                    { name: 'token', type: 'address' },
+                    { name: 'amount', type: 'uint256' },
+                    { name: 'flags', type: 'string[]' },
+                    { name: 'timestamp', type: 'uint256' },
+                ],
+            } as const;
+
+            const auth = await signTypedDataAsync({
+                domain,
+                types,
+                primaryType: 'Private Token Transfer',
+                message: {
+                    sender: address as `0x${string}`,
+                    recipient: TREASURY_SHIELDED,
+                    token: TOKEN_ADDRESS,
+                    amount: BigInt(amountWei),
+                    flags: [],
+                    timestamp: BigInt(timestamp),
+                },
+            });
+
+            const res = await fetch(`${API_URL}/auth/withdraw-eth`, {
+                method: 'POST',
+                headers: getHeaders(),
+                credentials: 'include',
+                body: JSON.stringify({ timestamp, auth, amount: amountWei }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Withdraw failed');
+            }
+
+            setWithdrawTxHash(data.ethTxHash || null);
+        } catch (err: any) {
+            setWithdrawError(err?.message || 'Withdraw failed');
+        } finally {
+            setWithdrawLoading(false);
+        }
+    };
 
     // ============= DISPUTE HELPERS =============
     const getOutcomeBadge = (dispute: Dispute) => {
@@ -514,7 +670,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Trust Score */}
+                {/* Private Balance */}
                 <div
                     className={`feature-card group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-6 ${visible ? 'animate-fade-up' : 'opacity-0'}`}
                     style={{ animationDelay: '0.3s' }}
@@ -522,27 +678,57 @@ export default function DashboardPage() {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-[#4C8BF5]/5 rounded-full blur-[60px] group-hover:bg-[#4C8BF5]/10 transition-colors duration-500 pointer-events-none" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">Trust Score</h3>
+                            <h3 className="text-gray-500 text-[11px] font-semibold uppercase tracking-wider">Private Balance</h3>
                             <div className="w-8 h-8 rounded-lg bg-[#4C8BF5]/10 flex items-center justify-center group-hover:bg-[#4C8BF5]/20 group-hover:scale-110 transition-all duration-300">
-                                <Shield size={14} className="text-[#4C8BF5]" />
+                                <Wallet size={14} className="text-[#4C8BF5]" />
                             </div>
                         </div>
                         <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-mono font-bold text-white group-hover:text-[#4C8BF5] transition-colors duration-300">{trustScore}</span>
-                            <span className="text-sm text-gray-500">/ 100</span>
+                            <span className="text-4xl font-mono font-bold text-white group-hover:text-[#4C8BF5] transition-colors duration-300">
+                                {formatPrivateBalance(privateBalance)}
+                            </span>
+                            <span className="text-sm text-gray-500">CLAG</span>
                         </div>
-                        {/* Arc-style progress */}
-                        <div className="relative mt-5 h-2 rounded-full overflow-hidden bg-white/[0.04]">
-                            <div
-                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
-                                style={{
-                                    width: `${trustScore}%`,
-                                    background: 'linear-gradient(90deg, #375BD2, #4C8BF5, #7C3AED)',
-                                    boxShadow: '0 0 12px rgba(76, 139, 245, 0.4)',
-                                }}
+                        <div className="flex items-center justify-between mt-5">
+                            <p className="text-[11px] text-gray-600">
+                                {user?.shieldedAddress
+                                    ? 'Private token balance held in Vault'
+                                    : 'Generate a shielded address to enable private balance'}
+                            </p>
+                            <button
+                                onClick={fetchPrivateBalance}
+                                disabled={privateBalanceLoading || !user?.shieldedAddress}
+                                className="text-[11px] px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
+                            >
+                                {privateBalanceLoading ? 'Fetching...' : privateBalance ? 'Refresh' : 'Sign to view'}
+                            </button>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                            <input
+                                value={withdrawAmount}
+                                onChange={(e) => setWithdrawAmount(e.target.value)}
+                                placeholder="Amount"
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#4C8BF5]/40"
                             />
+                            <button
+                                onClick={withdrawToEth}
+                                disabled={withdrawLoading || !user?.shieldedAddress}
+                                className="text-xs px-3 py-2 rounded-lg bg-[#4C8BF5]/20 border border-[#4C8BF5]/30 text-[#9ec1ff] hover:bg-[#4C8BF5]/30 transition-colors disabled:opacity-50"
+                            >
+                                {withdrawLoading ? 'Withdrawing...' : 'Withdraw ETH'}
+                            </button>
                         </div>
-                        <p className="text-[11px] text-gray-600 mt-3">{trustLabel}</p>
+                        {withdrawError && (
+                            <p className="text-[11px] text-red-400 mt-2">{withdrawError}</p>
+                        )}
+                        {withdrawTxHash && (
+                            <p className="text-[11px] text-emerald-400 mt-2">
+                                ETH payout tx: {withdrawTxHash.slice(0, 10)}...
+                            </p>
+                        )}
+                        {privateBalanceError && (
+                            <p className="text-[11px] text-red-400 mt-2">{privateBalanceError}</p>
+                        )}
                     </div>
                 </div>
             </div>

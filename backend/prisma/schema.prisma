@@ -136,6 +136,7 @@ model Transaction {
   paymentTransactionId   String?           // Private Token API transaction_id
   paymentHeader          String?           @db.Text
   settlementTxHash       String?
+  privateTransferTxId    String?           // Private Token API transaction_id for shielded payout
   encryptedDisputeReason String?
   aiDecision             String?           // 'AI_VALID', 'AI_INVALID'
   aiReasoning            String?           @db.Text

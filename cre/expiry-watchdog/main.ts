@@ -123,6 +123,32 @@ const onCronTrigger = (runtime: Runtime<Config>): string => {
       `View transaction at https://sepolia.etherscan.io/tx/${finalTxHash}`
     );
 
+    // ── Notify backend so DB is updated to REFUNDED ─────────────────
+    try {
+      const notifyPayload = JSON.stringify({
+        escrowKey,
+        txHash: finalTxHash,
+      });
+
+      const notifyResponse = confidentialHttp.sendRequest(runtime, {
+        request: {
+          url: `${config.backendUrl}/cre/expiry-refunded`,
+          method: "POST",
+          multiHeaders: {
+            "Content-Type": { values: ["application/json"] },
+          },
+          bodyString: notifyPayload,
+        },
+      }).result();
+
+      const notifyBody = new TextDecoder().decode(notifyResponse.body);
+      runtime.log(
+        `Backend notified: expiry-refunded status=${notifyResponse.statusCode} body=${notifyBody}`
+      );
+    } catch {
+      runtime.log(`Warning: failed to notify backend for expired ${escrowKey}`);
+    }
+
     processed++;
   }
 

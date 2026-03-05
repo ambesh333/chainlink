@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { ethers } from 'ethers';
 import { prisma } from '../context';
 import {
     verifyDeposit,
@@ -10,8 +11,15 @@ import {
     generateEscrowKey,
     getLockedAmount,
 } from '../clients/escrowClient';
+import { executePrivateSettlement } from '../services/privateSettlementService';
 
 const ESCROW_CONTRACT_ADDRESS = process.env.ESCROW_CONTRACT_ADDRESS || '';
+
+// Derive platform treasury address from facilitator key — escrow ETH goes here
+// instead of directly to the merchant, enabling private token payout downstream.
+const PLATFORM_TREASURY_ADDRESS = process.env.FACILITATOR_PRIVATE_KEY
+    ? new ethers.Wallet(process.env.FACILITATOR_PRIVATE_KEY).address
+    : '';
 
 /**
  * Payment header sent by the agent after they have called deposit(key) on-chain.
@@ -75,13 +83,19 @@ export const accessResource = async (req: Request, res: Response) => {
 
         const priceWei = BigInt(Math.floor(resource.price * 1e18));
 
+        // Route escrow funds to platform treasury (facilitator wallet) instead of
+        // merchant directly. After on-chain settlement, the backend executes a
+        // private token transfer from the treasury vault to the merchant's shielded address.
+        const recipientAddress = PLATFORM_TREASURY_ADDRESS || resource.user.walletAddress;
+
         const paymentRequirements = {
             x402Version: 1,
             scheme: 'chainlink-escrow',
             network: 'ethereum-sepolia',
             chainId: 11155111,
             escrowContract: ESCROW_CONTRACT_ADDRESS,
-            merchantAddress: resource.user.walletAddress,
+            merchantAddress: recipientAddress,
+            treasuryAddress: PLATFORM_TREASURY_ADDRESS || undefined,
             amount: resource.price,
             amountWei: priceWei.toString(),
             resource: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
@@ -100,7 +114,7 @@ export const accessResource = async (req: Request, res: Response) => {
 
                     const { txHash } = await createEscrowOnChain(
                         key,
-                        resource.user.walletAddress,
+                        recipientAddress,
                         agentAddress,
                         priceWei,
                         holdDurationSeconds
@@ -327,9 +341,20 @@ export const settleTransaction = async (req: Request, res: Response) => {
                     },
                 });
 
+                // Idempotent fallback: ensure private transfer fires
+                let privateTransferTxId: string | null = null;
+                if (escrowKey) {
+                    try {
+                        privateTransferTxId = await executePrivateSettlement(escrowKey);
+                    } catch (err: any) {
+                        console.warn(`[Gateway] Private settlement fallback failed: ${err.message}`);
+                    }
+                }
+
                 return res.json({
                     success: true,
                     status: updatedTx.status,
+                    privateTransferTxId,
                     message: 'Funds released to merchant on-chain via CRE.',
                 });
             } else {

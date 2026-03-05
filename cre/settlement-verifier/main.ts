@@ -74,6 +74,13 @@ const onSettlementRequested = (
   let delivered = false;
 
   try {
+    if (verifyResponse.statusCode && verifyResponse.statusCode >= 400) {
+      const bodyStr = new TextDecoder().decode(verifyResponse.body);
+      runtime.log(
+        `Verify-delivery failed: status=${verifyResponse.statusCode}, body=${bodyStr}`
+      );
+      return `Error: verify-delivery ${verifyResponse.statusCode}`;
+    }
     const bodyStr = new TextDecoder().decode(verifyResponse.body);
     const result = JSON.parse(bodyStr);
     delivered = result.delivered === true;
@@ -143,20 +150,67 @@ const onSettlementRequested = (
       txHash: finalTxHash,
     });
 
-    confidentialHttp.sendRequest(runtime, {
+    const notifyResponse = confidentialHttp.sendRequest(runtime, {
       request: {
         url: `${config.backendUrl}/cre/settlement-complete`,
         method: "POST",
         multiHeaders: {
           "Content-Type": { values: ["application/json"] },
         },
-        body: { value: notifyPayload, case: "bodyString" as const },
+        bodyString: notifyPayload,
       },
     }).result();
 
-    runtime.log(`Backend notified: settlement-complete for ${escrowKey}`);
+    const notifyBody = new TextDecoder().decode(notifyResponse.body);
+    runtime.log(
+      `Backend notified: settlement-complete status=${notifyResponse.statusCode} body=${notifyBody}`
+    );
   } catch {
     runtime.log(`Warning: failed to notify backend for ${escrowKey}`);
+  }
+
+  // ── 5. Trigger private token transfer via backend ──────────────────
+  try {
+    const privateSettlePayload = JSON.stringify({ escrowKey });
+
+    const privateSettleResponse = confidentialHttp.sendRequest(runtime, {
+      request: {
+        url: `${config.backendUrl}/cre/private-settle`,
+        method: "POST",
+        multiHeaders: {
+          "Content-Type": { values: ["application/json"] },
+        },
+        bodyString: privateSettlePayload,
+      },
+    }).result();
+
+    const privateBody = new TextDecoder().decode(privateSettleResponse.body);
+    runtime.log(
+      `Private settlement triggered: status=${privateSettleResponse.statusCode} body=${privateBody}`
+    );
+  } catch {
+    runtime.log(`Warning: failed to trigger private settlement for ${escrowKey}`);
+  }
+
+  // ── 6. Verify private transfer completed ──────────────────────────
+  try {
+    const verifyPrivateResponse = confidentialHttp.sendRequest(runtime, {
+      request: {
+        url: `${config.backendUrl}/cre/verify-private-transfer/${escrowKey}`,
+        method: "GET",
+        multiHeaders: {
+          "Content-Type": { values: ["application/json"] },
+        },
+      },
+    }).result();
+
+    const verifyBody = new TextDecoder().decode(verifyPrivateResponse.body);
+    const verifyResult = JSON.parse(verifyBody);
+    runtime.log(
+      `Private transfer verified=${verifyResult.verified}, txId=${verifyResult.privateTransferTxId || "n/a"}`
+    );
+  } catch {
+    runtime.log(`Warning: failed to verify private transfer for ${escrowKey}`);
   }
 
   return `Settled: ${escrowKey} → payMerchant=true | txHash=${finalTxHash}`;
