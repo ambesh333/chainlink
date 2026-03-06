@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Save, Loader2, FlaskConical, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthContext';
@@ -31,6 +31,8 @@ export default function NewWorkflowPage() {
     const [schedule, setSchedule] = useState('*/5 * * * *');
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
+    const nodesRef = useRef<Node[]>([]);
+    const edgesRef = useRef<Edge[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
@@ -65,6 +67,8 @@ export default function NewWorkflowPage() {
     const handleCanvasChange = useCallback((newNodes: Node[], newEdges: Edge[]) => {
         setNodes(newNodes);
         setEdges(newEdges);
+        nodesRef.current = newNodes;
+        edgesRef.current = newEdges;
         setSaveError('');
     }, []);
 
@@ -74,9 +78,12 @@ export default function NewWorkflowPage() {
             return;
         }
 
+        const currentNodes = nodesRef.current;
+        const currentEdges = edgesRef.current;
+
         // Validate start/stop for non-draft saves
         if (status === 'ACTIVE') {
-            const err = validateWorkflow(nodes);
+            const err = validateWorkflow(currentNodes);
             if (err) { setSaveError(err); return; }
         }
 
@@ -91,7 +98,7 @@ export default function NewWorkflowPage() {
                 body: JSON.stringify({
                     name,
                     description: description || null,
-                    definition: { nodes, edges },
+                    definition: { nodes: currentNodes, edges: currentEdges },
                     schedule,
                 }),
             });
@@ -143,15 +150,6 @@ export default function NewWorkflowPage() {
                     />
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 mr-2">
-                        <label className="text-xs text-gray-500">Schedule:</label>
-                        <input
-                            type="text"
-                            value={schedule}
-                            onChange={(e) => setSchedule(e.target.value)}
-                            className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-xs text-white font-mono focus:border-[#375BD2] focus:outline-none w-32"
-                        />
-                    </div>
                     <button
                         onClick={() => handleSave('DRAFT')}
                         disabled={!name.trim() || isSaving}

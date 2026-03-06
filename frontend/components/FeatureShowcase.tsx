@@ -88,7 +88,14 @@ const features: FeatureItem[] = [
         videoSrc: '/landing/workflow.mp4',
         imageAlt: 'Workflow Builder',
         tags: ['Visual Builder', 'AI Generated', 'Scheduled Runs'],
-    }
+    },
+    // {
+    //     title: 'Privacy‑Preserving Payments',
+    //     subtitle: 'Shielded Settlements',
+    //     description: 'Merchants receive payouts through Chainlink Private Token shielded addresses — sender identity is hidden, balances stay confidential, and on‑chain escrow settles into private off‑chain transfers automatically.',
+    //     imageAlt: 'Privacy Shielded Payments',
+    //     tags: ['Shielded Addresses', 'Hide Sender', 'Private Transfers'],
+    // }
 ];
 
 export default function FeatureShowcase() {
@@ -101,7 +108,7 @@ export default function FeatureShowcase() {
                         Built for the <span className="bg-gradient-to-r from-[#2D50A2] to-[#041A54] bg-clip-text text-transparent">AI Economy</span>
                     </h2>
                     <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        From merchant analytics to workflow automation and x402 integration demos, Chainlink Agent gives you the full stack for private, on-chain AI commerce.
+                        From merchant analytics to workflow automation, shielded payments, and x402 integration — the full stack for private, on-chain AI commerce.
                     </p>
                 </div>
 

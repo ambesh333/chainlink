@@ -359,9 +359,17 @@ function executeWorkflow(
     return { status: "failed", log: "No nodes in workflow", steps: 0 };
   }
 
+  // Deduplicate edges by id
+  const seenEdgeIds = new Set<string>();
+  const dedupedEdges = edges.filter((e) => {
+    if (seenEdgeIds.has(e.id)) return false;
+    seenEdgeIds.add(e.id);
+    return true;
+  });
+
   // Build adjacency map: nodeId → [{ targetId, handle }]
   const adjacency: Record<string, { target: string; handle: string }[]> = {};
-  for (const edge of edges) {
+  for (const edge of dedupedEdges) {
     if (!adjacency[edge.source]) adjacency[edge.source] = [];
     adjacency[edge.source].push({
       target: edge.target,
@@ -370,7 +378,7 @@ function executeWorkflow(
   }
 
   // Find start node (trigger node, or first node with no incoming edges)
-  const targetIds = new Set(edges.map((e) => e.target));
+  const targetIds = new Set(dedupedEdges.map((e) => e.target));
   let startNode = nodes.find((n) => n.type === "trigger");
   if (!startNode) {
     startNode = nodes.find((n) => !targetIds.has(n.id));

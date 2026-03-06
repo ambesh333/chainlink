@@ -655,13 +655,20 @@ router.post('/workflow-action', async (req, res) => {
     try {
         const { action, resourceId, value } = req.body;
 
-        if (!action || !resourceId) {
-            return res.status(400).json({ error: 'action and resourceId are required' });
+        if (!action) {
+            return res.status(400).json({ error: 'action is required' });
         }
 
-        const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
-        if (!resource) {
-            return res.status(404).json({ error: 'Resource not found' });
+        // telegram_notify doesn't require a valid resource
+        let resource = null;
+        if (action !== 'telegram_notify') {
+            if (!resourceId) {
+                return res.status(400).json({ error: 'resourceId is required' });
+            }
+            resource = await prisma.resource.findUnique({ where: { id: resourceId } });
+            if (!resource) {
+                return res.status(404).json({ error: 'Resource not found' });
+            }
         }
 
         let result: any;

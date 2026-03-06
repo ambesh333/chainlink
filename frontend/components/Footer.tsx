@@ -25,7 +25,7 @@ export default function Footer() {
                             </span>
                         </Link>
                         <p className="text-gray-500 text-sm">
-                            The data gateway for AI agents on Ethereum.
+                            The private data gateway for AI agents on Ethereum — powered by shielded payments.
                         </p>
                     </div>
 

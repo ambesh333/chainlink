@@ -138,3 +138,31 @@ body {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px -12px rgba(45, 80, 162, 0.18);
 }
+
+/* React Flow overrides for workflow canvas */
+.react-flow__edge {
+  cursor: pointer;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #375BD2 !important;
+  stroke-width: 3 !important;
+}
+
+.react-flow__connection-line {
+  stroke: #375BD2 !important;
+  stroke-width: 2 !important;
+  stroke-dasharray: 5 5;
+}
+
+.react-flow__minimap {
+  border-radius: 8px !important;
+}
+
+.react-flow__node {
+  transition: box-shadow 0.2s ease;
+}
+
+.react-flow__node.selected {
+  z-index: 10 !important;
+}

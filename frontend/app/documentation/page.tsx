@@ -323,7 +323,7 @@ export default function DocumentationPage() {
                                 Merchant Workflows
                             </h2>
                             <div className="rounded-2xl overflow-hidden border border-white/10 mb-6">
-                                <img src="/docs/banner2.jpg" alt="Workflow Builder" className="w-full h-auto" />
+                                <img src="/landing/100M.png" alt="Workflow Builder" className="w-full h-auto" />
                             </div>
                             <p className="text-gray-400 text-lg leading-relaxed mb-6">
                                 Merchants can build visual workflows to automate pricing, availability, and resource actions.

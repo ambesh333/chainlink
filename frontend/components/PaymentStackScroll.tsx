@@ -2,28 +2,28 @@ import Image from 'next/image';
 
 const layerInfo = [
     {
-        title: "Gateway Request",
-        description: "Agent requests a resource via the x402 gateway and receives a 402 challenge",
+        title: "x402 Gateway Challenge",
+        description: "Agent requests a resource, receives a 402 challenge with escrow key, contract address, and required deposit amount",
         color: "#2D50A2",
         image: "/bento/landscape2.png"
     },
     {
-        title: "402 Payment Requirements",
-        description: "Backend returns escrow key, contract address, and required amount",
-        color: "#132A63",
-        image: "/bento/landscape3.png"
-    },
-    {
         title: "On-Chain Escrow Deposit",
-        description: "Agent deposits ETH, retries with X-Payment header, and receives content",
-        color: "#041A54",
+        description: "Agent deposits ETH into the escrow contract, retries with X-Payment header, and receives the paywalled content",
+        color: "#132A63",
         image: "/bento/landscape1.png"
     },
     {
         title: "Settlement or Dispute",
-        description: "Agent calls requestSettlement or raiseDispute; CRE finalizes on-chain",
-        color: "#0D1B39",
+        description: "Agent calls requestSettlement or raiseDispute; CRE workflows finalize the outcome on-chain via Chainlink Automation",
+        color: "#041A54",
         image: "/bento/landscape2.png"
+    },
+    {
+        title: "Private Shielded Payout",
+        description: "Settled funds move from platform treasury to the merchant's shielded address via Chainlink Private Tokens — sender hidden, balances confidential",
+        color: "#0D1B39",
+        image: "/bento/landscape3.png"
     }
 ];
 
@@ -37,7 +37,7 @@ export default function PaymentStackScroll() {
                         Payment <span className="bg-gradient-to-r from-[#2D50A2] to-[#041A54] bg-clip-text text-transparent">Protocol Stack</span>
                     </h2>
                     <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        Four layers of trust — from payment initiation to final settlement.
+                        Four layers of trust — from payment initiation to private, shielded settlement.
                     </p>
                 </div>
 

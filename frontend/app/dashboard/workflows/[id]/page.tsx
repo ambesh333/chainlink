@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Save, Play, Pause, Trash2, Loader2, Clock, Zap, FlaskConical, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/components/AuthContext';
@@ -48,6 +48,8 @@ export default function EditWorkflowPage() {
     const [schedule, setSchedule] = useState('');
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
+    const nodesRef = useRef<Node[]>([]);
+    const edgesRef = useRef<Edge[]>([]);
     const [resources, setResources] = useState<Resource[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -108,8 +110,12 @@ export default function EditWorkflowPage() {
                     setName(wf.name);
                     setDescription(wf.description || '');
                     setSchedule(wf.schedule || '*/5 * * * *');
-                    setNodes(wf.definition?.nodes || []);
-                    setEdges(wf.definition?.edges || []);
+                    const loadedNodes = wf.definition?.nodes || [];
+                    const loadedEdges = wf.definition?.edges || [];
+                    setNodes(loadedNodes);
+                    setEdges(loadedEdges);
+                    nodesRef.current = loadedNodes;
+                    edgesRef.current = loadedEdges;
                 }
 
                 if (resRes.ok) {
@@ -128,6 +134,8 @@ export default function EditWorkflowPage() {
     const handleCanvasChange = useCallback((newNodes: Node[], newEdges: Edge[]) => {
         setNodes(newNodes);
         setEdges(newEdges);
+        nodesRef.current = newNodes;
+        edgesRef.current = newEdges;
         setValidationError('');
     }, []);
 
@@ -136,6 +144,8 @@ export default function EditWorkflowPage() {
         setValidationError('');
         try {
             const API_URL = getApiUrl();
+            const currentNodes = nodesRef.current;
+            const currentEdges = edgesRef.current;
             await fetch(`${API_URL}/workflows/${workflowId}`, {
                 method: 'PATCH',
                 headers: getHeaders(),
@@ -143,7 +153,7 @@ export default function EditWorkflowPage() {
                 body: JSON.stringify({
                     name,
                     description: description || null,
-                    definition: { nodes, edges },
+                    definition: { nodes: currentNodes, edges: currentEdges },
                     schedule,
                 }),
             });
@@ -155,7 +165,9 @@ export default function EditWorkflowPage() {
     };
 
     const handleTest = async () => {
-        const err = validateWorkflow(nodes);
+        const currentNodes = nodesRef.current;
+        const currentEdges = edgesRef.current;
+        const err = validateWorkflow(currentNodes);
         if (err) { setValidationError(err); return; }
 
         // Save first, then test
@@ -174,7 +186,7 @@ export default function EditWorkflowPage() {
                 body: JSON.stringify({
                     name,
                     description: description || null,
-                    definition: { nodes, edges },
+                    definition: { nodes: currentNodes, edges: currentEdges },
                     schedule,
                 }),
             });
@@ -206,7 +218,7 @@ export default function EditWorkflowPage() {
         if (!workflow) return;
 
         if (workflow.status !== 'ACTIVE') {
-            const err = validateWorkflow(nodes);
+            const err = validateWorkflow(nodesRef.current);
             if (err) { setValidationError(err); return; }
         }
 
@@ -294,15 +306,6 @@ export default function EditWorkflowPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 mr-2">
-                        <label className="text-xs text-gray-500">Schedule:</label>
-                        <input
-                            type="text"
-                            value={schedule}
-                            onChange={(e) => setSchedule(e.target.value)}
-                            className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-xs text-white font-mono focus:border-[#375BD2] focus:outline-none w-32"
-                        />
-                    </div>
                     <button
                         onClick={handleTest}
                         disabled={isTesting}

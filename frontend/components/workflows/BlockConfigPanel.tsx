@@ -1,8 +1,9 @@
 'use client';
 import React, { useState } from 'react';
-import { X, Settings, Info, Trash2 } from 'lucide-react';
+import { X, Settings, Info, Trash2, Send, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import type { Node } from '@xyflow/react';
 import type { BlockNodeData } from './BlockNode';
+import { getApiUrl } from '@/lib/config';
 
 interface Resource {
     id: string;
@@ -79,6 +80,67 @@ function FieldLabel({ label, tooltip }: { label: string; tooltip?: string }) {
             {label}
             {tooltip && <InfoTooltip text={tooltip} />}
         </label>
+    );
+}
+
+function TelegramTestButton({ chatId, botToken }: { chatId?: string; botToken?: string }) {
+    const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+    const [errorMsg, setErrorMsg] = useState('');
+
+    const sendTest = async () => {
+        if (!chatId) { setStatus('error'); setErrorMsg('Chat ID is required'); return; }
+        setStatus('sending');
+        setErrorMsg('');
+        try {
+            const API_URL = getApiUrl();
+            const res = await fetch(`${API_URL}/cre/workflow-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'telegram_notify',
+                    resourceId: 'test',
+                    chatId,
+                    message: 'Hello World! Your Telegram bot is configured correctly.',
+                    botToken: botToken || undefined,
+                    context: {},
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.result?.messageSent) {
+                setStatus('success');
+            } else {
+                setStatus('error');
+                setErrorMsg(data.result?.description || data.error || 'Failed to send');
+            }
+        } catch (e: any) {
+            setStatus('error');
+            setErrorMsg(e.message || 'Network error');
+        }
+        setTimeout(() => setStatus('idle'), 4000);
+    };
+
+    return (
+        <div className="mb-4">
+            <button
+                onClick={sendTest}
+                disabled={status === 'sending'}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
+                style={{
+                    background: status === 'success' ? 'rgba(16,185,129,0.1)' : status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                    border: `1px solid ${status === 'success' ? 'rgba(16,185,129,0.3)' : status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                    color: status === 'success' ? '#10B981' : status === 'error' ? '#EF4444' : '#3B82F6',
+                }}
+            >
+                {status === 'sending' && <Loader2 size={12} className="animate-spin" />}
+                {status === 'success' && <CheckCircle size={12} />}
+                {status === 'error' && <AlertTriangle size={12} />}
+                {status === 'idle' && <Send size={12} />}
+                {status === 'sending' ? 'Sending...' : status === 'success' ? 'Sent!' : status === 'error' ? 'Failed' : 'Send Test Message'}
+            </button>
+            {status === 'error' && errorMsg && (
+                <p className="mt-1 text-[10px] text-red-400">{errorMsg}</p>
+            )}
+        </div>
     );
 }
 
@@ -336,6 +398,7 @@ export default function BlockConfigPanel({ node, resources, onUpdate, onClose, o
                             placeholder="Price is {{currentPrice}} ETH with {{accessCount}} accesses"
                         />
                     </div>
+                    <TelegramTestButton chatId={config.chatId} botToken={config.botToken} />
                 </>
             )}
 

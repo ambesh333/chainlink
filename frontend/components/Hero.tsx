@@ -58,7 +58,7 @@ export default function Hero() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.1 }}
                 >
-                    The End to End Marketplace for&nbsp;AI‑Native&nbsp;Data
+                    The Private, End‑to‑End Marketplace for&nbsp;AI‑Native&nbsp;Data
                 </motion.h1>
 
                 {/* Sub-headline */}
@@ -68,8 +68,8 @@ export default function Hero() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.25 }}
                 >
-                    Launch, sell, and automate data resources in one place — AI workflow builder, AI dispute resolution,
-                    and x402 escrow payments built in for a full end‑to‑end marketplace.
+                    Launch, sell, and automate data resources with privacy built in — shielded payments via Chainlink Private Tokens,
+                    AI workflow builder, AI dispute resolution, and x402 escrow for a full end‑to‑end marketplace.
                 </motion.p>
 
                 {/* CTA buttons  */}
