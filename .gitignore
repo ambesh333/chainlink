@@ -1,1 +1,9 @@
-*.md
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+CLAUDE.md
+doc
+.claude

@@ -1,139 +1,131 @@
 # Chainlink Agent — Smart Contracts
 
-On-chain escrow and AI-powered dispute resolution contracts for the Chainlink Agent marketplace.
+Solidity contracts for on-chain escrow and Chainlink CRE report consumption, deployed on Ethereum Sepolia.
+
+## Contracts
+
+| Contract | Purpose |
+|----------|---------|
+| `EscrowMarketplace.sol` | ETH/ERC-20 escrow with state machine (Created -> Funded -> Disputed -> Settled/Released) |
+| `DisputeConsumer.sol` | Receives Chainlink CRE signed reports via Forwarder, calls `finalizeSettlement()` or `resolveDispute()` |
+| `ReceiverTemplate.sol` | Abstract Chainlink IReceiver — validates CRE reports and decodes metadata |
+| `IReceiver.sol` | Chainlink CRE report receiver interface |
+| `IERC165.sol` | Interface support for Chainlink IReceiver compatibility |
+| `SimpleToken.sol` | ERC-20 token used with Chainlink Private Token vault |
 
 ## Architecture
 
 ```
-User → EscrowMarketplace
-          ↓
-      DisputeRaised Event
-          ↓
-   CRE Workflow (AI)
-          ↓
-   KeystoneForwarder
-          ↓
-DisputeConsumer (ReceiverTemplate)
-          ↓
-EscrowMarketplace.finalizeSettlement()
+Agent calls requestSettlement() or raiseDispute()
+                    |
+                    v
+         EscrowMarketplace emits event
+                    |
+                    v
+          CRE Workflow (off-chain)
+          - Verify delivery / AI analysis
+                    |
+                    v
+          Signs report: { escrowKey, payMerchant }
+                    |
+                    v
+          Chainlink Forwarder
+                    |
+                    v
+          DisputeConsumer.onReport()
+            |                   |
+            v                   v
+     finalizeSettlement()   resolveDispute()
+     (pay merchant)         (refund agent)
 ```
 
-### Contracts
+## Setup
 
-| Contract | Purpose |
-|---|---|
-| `EscrowMarketplace.sol` | ETH/ERC20 escrow with state machine (Created → Funded → Disputed → Settled/Released) |
-| `DisputeConsumer.sol` | Receives CRE-signed reports via KeystoneForwarder and calls `finalizeSettlement()` |
-| `ReceiverTemplate.sol` | Base contract for Keystone report verification |
-| `IERC165.sol` / `IReceiver.sol` | Interfaces for Keystone compatibility |
+### Prerequisites
 
-## Foundry Toolkit
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
 
-- **Forge** — Build & test
-- **Cast** — Contract interaction
-- **Anvil** — Local node
-- **CRE CLI** — Workflow deployment
+### Install
 
-## Installation
-
-```shell
+```bash
 forge install
 ```
 
-## Build Contracts
+### Build
 
-```shell
+```bash
 forge build
 ```
 
-## Run Tests
+### Test
 
-```shell
+```bash
 forge test
+forge test -vvv          # Verbose
+forge test --match-test <TestName>  # Single test
 ```
 
-Optional verbose:
+## Deployment (Sepolia)
 
-```shell
-forge test -vvv
-```
+### 1. Environment Variables
 
-## Clean Build
-
-```shell
-forge clean
-forge build
-```
-
-## Local Node (Optional)
-
-```shell
-anvil
-```
-
-## Deployment Guide (Sepolia)
-
-### 1. Set Environment Variables
-
-```shell
+```bash
 export PRIVATE_KEY=your_private_key
 export SEPOLIA_RPC_URL=your_rpc_url
 ```
 
 ### 2. Deploy EscrowMarketplace
 
-```shell
+```bash
 forge script script/DeployEscrow.s.sol \
   --rpc-url $SEPOLIA_RPC_URL \
   --broadcast
 ```
 
-Save the deployed address:
+### 3. Deploy DisputeConsumer
 
-```shell
-ESCROW_ADDRESS=0x...
-```
+Uses Chainlink Forwarder address: `0x15fC6ae953E024d975e77382eEeC56A9101f9F88`
 
-### 3. Deploy DisputeConsumer (Simulation Mode)
-
-Use MockForwarder for simulation:
-
-```
-0x15fC6ae953E024d975e77382eEeC56A9101f9F88
-```
-
-Deploy:
-
-```shell
+```bash
 forge script script/DeployDisputeConsumer.s.sol \
   --rpc-url $SEPOLIA_RPC_URL \
   --broadcast
 ```
 
-### 4. Add DisputeConsumer as Facilitator
+### 4. Register DisputeConsumer as Facilitator
 
-> This step is **mandatory** — DisputeConsumer must be a facilitator on EscrowMarketplace to call `finalizeSettlement()`.
+DisputeConsumer must be a facilitator on EscrowMarketplace to call `finalizeSettlement()`:
 
-```shell
+```bash
 cast send $ESCROW_ADDRESS \
   "addFacilitator(address)" \
-  <DISPUTE_CONSUMER_ADDRESS> \
+  $DISPUTE_CONSUMER_ADDRESS \
   --private-key $PRIVATE_KEY \
   --rpc-url $SEPOLIA_RPC_URL
 ```
 
-### 5. Verify Facilitator (Optional)
+### 5. Deploy Private Token Contracts (Optional)
 
-```shell
-cast call $ESCROW_ADDRESS \
-  "facilitators(address)" \
-  <DISPUTE_CONSUMER_ADDRESS> \
-  --rpc-url $SEPOLIA_RPC_URL
+```bash
+forge script script/DeployPrivateTransfer.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --broadcast
 ```
 
-Should return `true`.
+This deploys SimpleToken + PolicyEngine + Vault for Chainlink Private Token integration.
 
-## Documentation
+## Deployment Scripts
 
-- [Foundry Book](https://book.getfoundry.sh/)
-- [Chainlink CRE Docs](https://docs.chain.link/)
+| Script | Purpose |
+|--------|---------|
+| `DeployEscrow.s.sol` | Deploy EscrowMarketplace |
+| `DeployDisputeConsumer.s.sol` | Deploy DisputeConsumer with Chainlink Forwarder |
+| `DeployPrivateTransfer.s.sol` | All-in-one Private Token setup |
+| `01_DeployToken.s.sol` — `07_WithdrawWithTicket.s.sol` | Step-by-step Private Token deployment |
+
+## Chainlink Integration
+
+- **DisputeConsumer.sol** extends `ReceiverTemplate.sol` which implements the Chainlink `IReceiver` interface
+- CRE workflows submit signed reports to DisputeConsumer via the Chainlink Forwarder (`0x15fC6ae953E024d975e77382eEeC56A9101f9F88`)
+- Reports contain `{ escrowKey, payMerchant }` — decoded in `onReport()` to finalize or refund
+- SimpleToken is registered with Chainlink Private Token vault for shielded transfers
